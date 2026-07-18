@@ -500,6 +500,24 @@ namespace RimSynapse.RegionsAndTerritories
 
             provinces = finalProvinces;
 
+            // Deduplicate tiles to ensure thread-safety for Map Mode Framework rendering
+            HashSet<int> assignedTiles = new HashSet<int>();
+            foreach (var p in provinces)
+            {
+                p.tiles = p.tiles.Distinct().ToList();
+                List<int> uniqueTiles = new List<int>();
+                foreach (int tileId in p.tiles)
+                {
+                    if (!assignedTiles.Contains(tileId))
+                    {
+                        assignedTiles.Add(tileId);
+                        uniqueTiles.Add(tileId);
+                        tileToProvinceId[tileId] = p.id;
+                    }
+                }
+                p.tiles = uniqueTiles;
+            }
+
             // Phase 5: Consolidation & Merging (Pass 2)
             Log.Message("[RimSynapse-RegionsAndTerritories] Starting MergeTinyDomains...");
             MergeTinyDomains(minWithFeatures, minNoFeatures);
@@ -867,8 +885,22 @@ namespace RimSynapse.RegionsAndTerritories
 
                     if (neighborWeights.Any())
                     {
-                        int bestNeighborId = neighborWeights.OrderByDescending(kv => kv.Value).First().Key;
-                        if (provinceMap.TryGetValue(bestNeighborId, out var bestNeighbor))
+                        var sortedNeighbors = neighborWeights.OrderByDescending(kv => kv.Value).ToList();
+                        GeographicProvince bestNeighbor = null;
+
+                        foreach (var kvp in sortedNeighbors)
+                        {
+                            if (provinceMap.TryGetValue(kvp.Key, out var neighborProv))
+                            {
+                                if (neighborProv.tiles.Count + p.tiles.Count <= FactionPlacementSettings.maxRegionSize + 50)
+                                {
+                                    bestNeighbor = neighborProv;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (bestNeighbor != null)
                         {
                             // Merge p into bestNeighbor
                             foreach (int tileId in p.tiles)

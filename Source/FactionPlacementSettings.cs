@@ -51,12 +51,16 @@ namespace RimSynapse.RegionsAndTerritories
         public static Dictionary<string, FactionPlacementProfile> profiles = new Dictionary<string, FactionPlacementProfile>();
         public static int minRegionSize = 75;
         public static int maxRegionSize = 150;
+        public static float maxThreatPercent = 0.50f;
+        public static float maxSettlementPercentOfRegions = 0.50f;
 
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref minRegionSize, "minRegionSize", 75);
             Scribe_Values.Look(ref maxRegionSize, "maxRegionSize", 150);
+            Scribe_Values.Look(ref maxThreatPercent, "maxThreatPercent", 0.50f);
+            Scribe_Values.Look(ref maxSettlementPercentOfRegions, "maxSettlementPercentOfRegions", 0.50f);
             
             List<FactionPlacementProfile> list = profiles.Values.ToList();
             Scribe_Collections.Look(ref list, "profiles", LookMode.Deep);

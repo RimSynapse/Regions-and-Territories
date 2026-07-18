@@ -150,28 +150,120 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 Log.Warning("[RimSynapse-RegionsAndTerritories] No provinces generated! Falling back to vanilla generator.");
                 return true;
             }
+            Faction playerFaction = Find.FactionManager?.OfPlayer;
 
             // Global tracking of provinces that already contain a settlement
             HashSet<GeographicProvince> occupiedProvinces = new HashSet<GeographicProvince>();
 
-            // Sort NPC Factions: Turn Order is specified by profile.placementOrder (customizable in mod settings).
-            var sortedNPCFactions = allNPCFactions
+            // Calculate raw target base counts for all NPC factions
+            Dictionary<Faction, int> factionTargetBases = new Dictionary<Faction, int>();
+            int totalHostileTarget = 0;
+            int totalNonHostileTarget = 0;
+
+            float mapSizeMult = coverage / 0.05f;
+            float landRatio = (float)landTilesCount / totalTiles;
+            float landRatioMult = landRatio / 0.05f;
+
+            foreach (var faction in allNPCFactions)
+            {
+                float rngVal = GetFactionRng(faction);
+                int baseCount = Mathf.RoundToInt((mapSizeMult * landRatioMult * rngVal) / 6f);
+                baseCount = Mathf.Clamp(baseCount, 1, 40);
+
+                factionTargetBases[faction] = baseCount;
+
+                bool isHostile = (playerFaction != null) ? faction.HostileTo(playerFaction) : faction.def.permanentEnemy;
+                if (isHostile)
+                {
+                    totalHostileTarget += baseCount;
+                }
+                else
+                {
+                    totalNonHostileTarget += baseCount;
+                }
+            }
+
+            // Adjust for threat percentage cap (default 50%)
+            float maxThreatPercent = FactionPlacementSettings.maxThreatPercent;
+            if (maxThreatPercent < 1.0f && totalNonHostileTarget > 0)
+            {
+                int maxHostileAllowed = Mathf.RoundToInt(totalNonHostileTarget * maxThreatPercent / (1f - maxThreatPercent));
+                if (totalHostileTarget > maxHostileAllowed)
+                {
+                    float hostileScale = (float)maxHostileAllowed / totalHostileTarget;
+                    foreach (var faction in allNPCFactions)
+                    {
+                        bool isHostile = (playerFaction != null) ? faction.HostileTo(playerFaction) : faction.def.permanentEnemy;
+                        if (isHostile)
+                        {
+                            int scaled = Mathf.RoundToInt(factionTargetBases[faction] * hostileScale);
+                            factionTargetBases[faction] = Mathf.Max(1, scaled);
+                        }
+                    }
+                }
+            }
+
+            // Adjust for total settlement count cap (default 50% of regions)
+            int totalBasesAfterThreat = factionTargetBases.Values.Sum();
+            float maxSettlementPercentOfRegions = FactionPlacementSettings.maxSettlementPercentOfRegions;
+            int maxBasesAllowed = Mathf.RoundToInt(allProvinces.Count * maxSettlementPercentOfRegions);
+
+            if (totalBasesAfterThreat > maxBasesAllowed)
+            {
+                float globalScale = (float)maxBasesAllowed / totalBasesAfterThreat;
+                foreach (var faction in allNPCFactions)
+                {
+                    int scaled = Mathf.RoundToInt(factionTargetBases[faction] * globalScale);
+                    factionTargetBases[faction] = Mathf.Max(1, scaled);
+                }
+            }
+
+            // Sort and interleave NPC Factions: 1 Industrial, then 1 Tribal, etc.
+            var industrials = allNPCFactions
+                .Where(f => f.def.techLevel == TechLevel.Industrial)
                 .OrderBy(f => GetCategoryPriority(f))
-                .ThenBy(f => (Faction.OfPlayer != null && f.HostileTo(Faction.OfPlayer)) ? 1 : 0)
+                .ThenBy(f => (playerFaction != null && f.HostileTo(playerFaction)) ? 1 : 0)
                 .ToList();
 
-            foreach (var faction in sortedNPCFactions)
+            var tribals = allNPCFactions
+                .Where(f => f.def.techLevel < TechLevel.Industrial)
+                .OrderBy(f => GetCategoryPriority(f))
+                .ThenBy(f => (playerFaction != null && f.HostileTo(playerFaction)) ? 1 : 0)
+                .ToList();
+
+            var others = allNPCFactions
+                .Where(f => f.def.techLevel > TechLevel.Industrial)
+                .OrderBy(f => GetCategoryPriority(f))
+                .ThenBy(f => (playerFaction != null && f.HostileTo(playerFaction)) ? 1 : 0)
+                .ToList();
+
+            List<Faction> alternatingFactions = new List<Faction>();
+            int indIndex = 0;
+            int triIndex = 0;
+            int othIndex = 0;
+
+            while (indIndex < industrials.Count || triIndex < tribals.Count || othIndex < others.Count)
+            {
+                if (indIndex < industrials.Count)
+                {
+                    alternatingFactions.Add(industrials[indIndex++]);
+                }
+                if (triIndex < tribals.Count)
+                {
+                    alternatingFactions.Add(tribals[triIndex++]);
+                }
+                if (othIndex < others.Count)
+                {
+                    alternatingFactions.Add(others[othIndex++]);
+                }
+            }
+
+            foreach (var faction in alternatingFactions)
             {
                 var profile = FactionPlacementSettings.GetProfile(faction.def);
                 if (profile == null) continue;
 
-                // Base counts based on tech level scaled by coverage (Industrial ~20, Spacer ~3, Tribal ~5)
-                int baseTarget = 5;
-                if (faction.def.techLevel == TechLevel.Industrial) baseTarget = 20;
-                else if (faction.def.techLevel >= TechLevel.Spacer) baseTarget = 3;
-
-                int baseCount = Mathf.RoundToInt(baseTarget * (coverage / 0.3f));
-                baseCount = Mathf.Clamp(baseCount, 1, 40);
+                int baseCount = factionTargetBases.ContainsKey(faction) ? factionTargetBases[faction] : 5;
 
                 Dictionary<int, float> tileScores = new Dictionary<int, float>();
                 for (int t = 0; t < totalTiles; t++)
@@ -218,6 +310,18 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 Dictionary<GeographicProvince, float> provinceScores = new Dictionary<GeographicProvince, float>();
                 foreach (var p in allProvinces)
                 {
+                    // Do not place settlements in area of less than 20 tiles
+                    if (p.tiles == null)
+                    {
+                        provinceScores[p] = -9999f;
+                        continue;
+                    }
+                    if (p.tiles.Count < 20)
+                    {
+                        provinceScores[p] = -9999f;
+                        continue;
+                    }
+
                     var validTiles = p.tiles.Where(t => tileScores.ContainsKey(t) && tileScores[t] > -9999f).ToList();
                     if (validTiles.Count == 0)
                     {
@@ -231,7 +335,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 List<int> factionBases = new List<int>();
 
                 // Define hard adjacency requirement: friendly and neutral factions (excluding the Empire)
-                bool isFriendlyOrNeutral = (Faction.OfPlayer != null) ? !faction.HostileTo(Faction.OfPlayer) : !faction.def.permanentEnemy;
+                bool isFriendlyOrNeutral = (playerFaction != null) ? !faction.HostileTo(playerFaction) : !faction.def.permanentEnemy;
                 bool hasHardAdjacency = isFriendlyOrNeutral && (faction.def.defName != "Empire");
 
                 for (int b = 0; b < baseCount; b++)
@@ -239,10 +343,16 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                     GeographicProvince chosenProvince = null;
                     string factionId = faction.GetUniqueLoadID();
 
-                    // Pre-calculate properties for all provinces
+                    // Pre-calculate properties for all provinces (excluding already occupied ones)
                     var allCandidates = allProvinces
+                        .Where(p => !occupiedProvinces.Contains(p))
                         .Select(p => {
                             float suitability = provinceScores.ContainsKey(p) ? provinceScores[p] : -9999f;
+                            if (suitability > -9999f && faction.def.techLevel < TechLevel.Industrial)
+                            {
+                                suitability += GetTribalBetweennessBonus(p, placedBases, worldGrid);
+                            }
+
                             if (suitability <= -9999f) return new { Province = p, Score = -9999f, ThisFactionCount = 999, GlobalCount = 999, IsAdjacent = false, Dist = 9999f, SharedBorders = 0, BarrierCount = 0 };
 
                             int thisFactionCount = p.owningFactionIds.Count(id => id == factionId);
@@ -270,10 +380,26 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                     // For factions with hard adjacency requirement, subsequent bases MUST be adjacent (if any adjacent valid provinces exist)
                     if (b > 0 && hasHardAdjacency && factionProvinces.Any())
                     {
-                        var adjacentOnly = allCandidates.Where(x => x.IsAdjacent).ToList();
+                        var adjacentOnly = allCandidates
+                            .Where(x => x.IsAdjacent)
+                            .Where(x => x.ThisFactionCount == 0)
+                            .ToList();
                         if (adjacentOnly.Any())
                         {
                             allCandidates = adjacentOnly;
+                        }
+                        else
+                        {
+                            // If there are NO adjacent tiles/provinces, place it to the nearest not claimed region without a settlement
+                            var nearestUnclaimedUnoccupied = allCandidates
+                                .Where(x => x.GlobalCount == 0)
+                                .OrderBy(x => x.Dist)
+                                .ToList();
+
+                            if (nearestUnclaimedUnoccupied.Any())
+                            {
+                                allCandidates = nearestUnclaimedUnoccupied;
+                            }
                         }
                     }
 
@@ -340,6 +466,23 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 }
 
                 Log.Message($"[RimSynapse-RegionsAndTerritories] Placed {factionBases.Count} bases across {factionProvinces.Count} provinces for faction: {faction.Name}");
+            }
+
+            // Redistribute NPC faction colors deterministically to ensure high vibrance and distinct visual separation
+            var assignableFactions = factionManager.AllFactions
+                .Where(f => !f.IsPlayer && !f.def.hidden && f.def.defName != "Empire")
+                .ToList();
+
+            if (assignableFactions.Any())
+            {
+                System.Random colorRand = new System.Random(Find.World.info.Seed);
+                var shuffled = assignableFactions.OrderBy(x => colorRand.Next()).ToList();
+                for (int i = 0; i < shuffled.Count; i++)
+                {
+                    float hue = (float)i / shuffled.Count;
+                    Color uniqueColor = Color.HSVToRGB(hue, 0.60f, 0.90f);
+                    shuffled[i].color = uniqueColor;
+                }
             }
 
             RoadGeneratorHelper.GenerateRoadsBetweenBases();
@@ -475,6 +618,74 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 }
             }
             return barrierCount;
+        }
+
+        private static float GetFactionRng(Faction faction)
+        {
+            if (faction.def.defName.ToLower().Contains("pirate") || faction.def.label.ToLower().Contains("pirate"))
+            {
+                return UnityEngine.Random.Range(1f, 3f);
+            }
+            if (faction.def.techLevel == TechLevel.Industrial)
+            {
+                return UnityEngine.Random.Range(1f, 5f);
+            }
+            if (faction.def.techLevel >= TechLevel.Spacer)
+            {
+                return UnityEngine.Random.Range(1f, 2f);
+            }
+            return UnityEngine.Random.Range(1f, 2f); // Tribal / default
+        }
+
+        private static float GetTribalBetweennessBonus(GeographicProvince p, List<int> allPlacedBases, WorldGrid worldGrid)
+        {
+            if (p.tiles.Count == 0 || !allPlacedBases.Any()) return 0f;
+
+            // Find all placed bases that belong to Industrial factions
+            Dictionary<string, List<int>> industrialBasesByFaction = new Dictionary<string, List<int>>();
+            foreach (int tile in allPlacedBases)
+            {
+                var settlement = Find.WorldObjects.Settlements.FirstOrDefault(s => s.Tile == tile);
+                if (settlement != null && settlement.Faction != null && settlement.Faction.def.techLevel == TechLevel.Industrial)
+                {
+                    string fId = settlement.Faction.GetUniqueLoadID();
+                    if (!industrialBasesByFaction.ContainsKey(fId))
+                    {
+                        industrialBasesByFaction[fId] = new List<int>();
+                    }
+                    industrialBasesByFaction[fId].Add(tile);
+                }
+            }
+
+            if (industrialBasesByFaction.Count < 2) return 0f;
+
+            // Calculate min distance to each industrial faction
+            List<float> minDists = new List<float>();
+            int tileCenter = p.tiles[0];
+
+            foreach (var kvp in industrialBasesByFaction)
+            {
+                float minDist = 9999f;
+                foreach (int baseTile in kvp.Value)
+                {
+                    float dist = worldGrid.ApproxDistanceInTiles(tileCenter, baseTile);
+                    if (dist < minDist) minDist = dist;
+                }
+                minDists.Add(minDist);
+            }
+
+            minDists.Sort();
+
+            float minDistF1 = minDists[0];
+            float minDistF2 = minDists[1];
+
+            // If both are within 30 tiles, calculate betweenness
+            if (minDistF1 < 30f && minDistF2 < 30f)
+            {
+                return 50f / (minDistF1 + minDistF2);
+            }
+
+            return 0f;
         }
     }
 

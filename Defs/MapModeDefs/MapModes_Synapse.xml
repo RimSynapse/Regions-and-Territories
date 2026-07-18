@@ -2,7 +2,7 @@
 <Defs>
   <MapModeFramework.MapModeDef>
     <defName>SynapsePopulationDensity</defName>
-    <label>population density</label>
+    <label>dwellings</label>
     <description>Visualizes the density of pawn dwellings across the planet.</description>
     <mapModeClass>RimSynapse.RegionsAndTerritories.MapMode_PopulationDensity</mapModeClass>
     <worldLayerClass>MapModeFramework.WorldLayer_MapMode_Terrain</worldLayerClass>

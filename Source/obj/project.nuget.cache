@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "k4NT610ZISo=",
+  "dgSpecHash": "86+ahhYy86s=",
   "success": true,
-  "projectFilePath": "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
+  "projectFilePath": "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\sealt\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
     "C:\\Users\\sealt\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"

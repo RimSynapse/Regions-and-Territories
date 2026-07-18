@@ -16,6 +16,7 @@ namespace RimSynapse.RegionsAndTerritories
         public override Material RegionMaterial => BaseContent.ClearMat;
 
         private static Dictionary<string, Texture2D> stripedTextureCache = new Dictionary<string, Texture2D>();
+        private static Dictionary<string, Material> stripedMaterialCache = new Dictionary<string, Material>();
 
         public MapMode_FactionTerritory() { }
         public MapMode_FactionTerritory(MapModeDef def) : base(def) { }
@@ -74,15 +75,20 @@ namespace RimSynapse.RegionsAndTerritories
                     Faction f2 = factions[1];
                     string cacheKey = $"{f1.GetUniqueLoadID()}||{f2.GetUniqueLoadID()}";
 
-                    Texture2D stripedTex = GetOrCreateStripedTexture(f1.Color, f2.Color, cacheKey);
-                    
-                    if (ShaderDatabase.MetaOverlay != null && stripedTex != null)
+                    if (!stripedMaterialCache.TryGetValue(cacheKey, out bodyMat) || bodyMat == null)
                     {
-                        bodyMat = MaterialPool.MatFrom(stripedTex, ShaderDatabase.MetaOverlay, Color.white, 3510);
-                    }
-                    if (bodyMat == null)
-                    {
-                        bodyMat = BaseContent.WhiteMat;
+                        Texture2D stripedTex = GetOrCreateStripedTexture(f1.Color, f2.Color, cacheKey);
+                        if (ShaderDatabase.MetaOverlay != null && stripedTex != null)
+                        {
+                            bodyMat = new Material(ShaderDatabase.MetaOverlay);
+                            bodyMat.mainTexture = stripedTex;
+                            bodyMat.mainTextureScale = new Vector2(0.25f, 0.25f);
+                        }
+                        if (bodyMat == null)
+                        {
+                            bodyMat = BaseContent.WhiteMat;
+                        }
+                        stripedMaterialCache[cacheKey] = bodyMat;
                     }
 
                     borderColor = new Color(0.7f, 0.7f, 0.7f, 0.9f);
@@ -123,10 +129,10 @@ namespace RimSynapse.RegionsAndTerritories
                 return cachedTex;
             }
 
-            int size = 32;
+            int size = 64;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Point;
+            tex.filterMode = FilterMode.Bilinear;
 
             Color c1 = new Color(color1.r, color1.g, color1.b, 0.35f);
             Color c2 = new Color(color2.r, color2.g, color2.b, 0.35f);
@@ -135,7 +141,7 @@ namespace RimSynapse.RegionsAndTerritories
             {
                 for (int x = 0; x < size; x++)
                 {
-                    bool isStripe1 = ((x + y) / 4) % 2 == 0;
+                    bool isStripe1 = ((x + y) / 16) % 2 == 0;
                     tex.SetPixel(x, y, isStripe1 ? c1 : c2);
                 }
             }

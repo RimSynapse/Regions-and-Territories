@@ -58,7 +58,7 @@ namespace RimSynapse.RegionsAndTerritories
             if (estMax < 1) estMax = 1;
 
             // Global Map Region Parameters Panel
-            Rect globalBoxRect = new Rect(0f, 40f, inRect.width - 15f, 110f);
+            Rect globalBoxRect = new Rect(0f, 40f, inRect.width - 15f, 160f);
             Widgets.DrawMenuSection(globalBoxRect);
 
             Rect globalTitleRect = new Rect(10f, 44f, 300f, 22f);
@@ -80,11 +80,24 @@ namespace RimSynapse.RegionsAndTerritories
             float tempMax = Widgets.HorizontalSlider(maxSliderRect, FactionPlacementSettings.maxRegionSize, 50f, 400f, false, null, null, null, 1f);
             FactionPlacementSettings.maxRegionSize = Mathf.RoundToInt(tempMax);
 
+            // Second Row (Max Threat / Max Occupancy)
+            Rect threatLabelRect = new Rect(10f, 98f, 150f, 22f);
+            Widgets.Label(threatLabelRect, $"Max Threat: {Mathf.RoundToInt(FactionPlacementSettings.maxThreatPercent * 100f)}%");
+            Rect threatSliderRect = new Rect(165f, 100f, colWidth - 170f, 18f);
+            float tempThreat = Widgets.HorizontalSlider(threatSliderRect, FactionPlacementSettings.maxThreatPercent, 0.10f, 1.00f, false, null, null, null, 0.01f);
+            FactionPlacementSettings.maxThreatPercent = tempThreat;
+
+            Rect occupLabelRect = new Rect(rightColStart, 98f, 150f, 22f);
+            Widgets.Label(occupLabelRect, $"Max Occupancy: {Mathf.RoundToInt(FactionPlacementSettings.maxSettlementPercentOfRegions * 100f)}%");
+            Rect occupSliderRect = new Rect(rightColStart + 165f, 100f, colWidth - 170f, 18f);
+            float tempOccup = Widgets.HorizontalSlider(occupSliderRect, FactionPlacementSettings.maxSettlementPercentOfRegions, 0.10f, 0.90f, false, null, null, null, 0.01f);
+            FactionPlacementSettings.maxSettlementPercentOfRegions = tempOccup;
+
             // Estimates row
-            Rect estRect = new Rect(10f, 120f, globalBoxRect.width - 20f, 22f);
+            Rect estRect = new Rect(10f, 135f, globalBoxRect.width - 20f, 22f);
             Widgets.Label(estRect, $"Estimated Land Tiles: <color=cyan>{landTiles}</color> (at {Mathf.RoundToInt(coverage * 100f)}% coverage) | Expected Region Count: <color=green>{estMin} - {estMax}</color> (Avg Size: {avgSize:F0} tiles)");
 
-            Rect outRect = new Rect(0f, 160f, inRect.width, inRect.height - 215f);
+            Rect outRect = new Rect(0f, 210f, inRect.width, inRect.height - 265f);
             Rect viewRect = new Rect(0f, 0f, inRect.width - 25f, activeFactions.Count * 265f);
 
             Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect);
