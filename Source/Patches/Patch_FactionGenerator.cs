@@ -15,7 +15,13 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPrefix]
         public static bool Prefix(PlanetLayer layer, List<FactionDef> factions)
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...");
+            if (layer == null || layer.Def == null || layer.Def.defName != "Surface")
+            {
+                Log.Message($"[RimSynapse-RegionsAndTerritories] Bypassing custom faction generator for non-surface layer '{layer?.Def?.defName ?? "null"}'. Falling back to vanilla.");
+                return true;
+            }
+
+            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...\n" + new System.Diagnostics.StackTrace().ToString());
 
             World world = Find.World ?? Current.CreatingWorld;
             if (world == null || world.info == null || world.grid == null)
@@ -71,14 +77,26 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             if (targetFactionCount < 5) targetFactionCount = 5;
             if (targetFactionCount > 35) targetFactionCount = 35;
 
+            var canExistOnLayerMethod = typeof(FactionGenerator).GetMethod("CanExistOnLayer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
             List<FactionDef> poolToClone = DefDatabase<FactionDef>.AllDefs
                 .Where(f => !f.isPlayer && !f.hidden)
+                .Where(f => {
+                    if (canExistOnLayerMethod != null)
+                    {
+                        return (bool)canExistOnLayerMethod.Invoke(null, new object[] { layer, f });
+                    }
+                    return true;
+                })
                 .ToList();
 
             List<FactionDef> finalDefs = new List<FactionDef>();
             foreach (var def in factions)
             {
-                finalDefs.Add(def);
+                if (canExistOnLayerMethod == null || (bool)canExistOnLayerMethod.Invoke(null, new object[] { layer, def }))
+                {
+                    finalDefs.Add(def);
+                }
             }
 
             if (poolToClone.Any())
@@ -142,7 +160,16 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             }
 
             List<int> placedBases = new List<int>();
-            var allNPCFactions = factionManager.AllFactions.Where(f => !f.IsPlayer && !f.def.hidden).ToList();
+            var allNPCFactions = factionManager.AllFactions
+                .Where(f => !f.IsPlayer && !f.def.hidden)
+                .Where(f => {
+                    if (canExistOnLayerMethod != null)
+                    {
+                        return (bool)canExistOnLayerMethod.Invoke(null, new object[] { layer, f.def });
+                    }
+                    return true;
+                })
+                .ToList();
 
             var allProvinces = regionManager.Provinces;
             if (!allProvinces.Any())
@@ -705,7 +732,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPrefix]
         public static void Prefix()
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh PREFIX is executing!");
+            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh PREFIX is executing!\n" + new System.Diagnostics.StackTrace().ToString());
         }
     }
 }
