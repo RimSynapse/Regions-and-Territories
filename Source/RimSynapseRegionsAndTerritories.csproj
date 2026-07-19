@@ -44,6 +44,12 @@
             <HintPath>$(SteamWorkshopPath)\3296654393\1.6\Assemblies\MapModeFramework.dll</HintPath>
             <Private>false</Private>
         </Reference>
+        
+        <!-- Reference Core Mod -->
+        <Reference Include="RimSynapseCore">
+            <HintPath>..\..\Core\Assemblies\RimSynapseCore.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
     </ItemGroup>
 
 </Project>

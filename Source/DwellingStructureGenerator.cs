@@ -13,6 +13,17 @@ namespace RimSynapse.RegionsAndTerritories
         {
             if (map == null || count <= 0) return;
 
+            // Fetch faction safely for all structures and residents
+            Faction faction = Find.FactionManager.FirstFactionOfDef(FactionDefOf.OutlanderCivil);
+            if (faction == null)
+            {
+                faction = Find.FactionManager.AllFactions.FirstOrDefault(f => !f.HostileTo(Faction.OfPlayer) && !f.def.isPlayer);
+            }
+            if (faction == null)
+            {
+                faction = Find.FactionManager.OfAncients;
+            }
+
             // Cap individual dwellings at 5; if population is larger, allocate the rest to Barracks (max 3 barracks)
             int targetDwellings = Math.Min(count, 5);
             int remainingPop = count - targetDwellings;
@@ -66,11 +77,11 @@ namespace RimSynapse.RegionsAndTerritories
                             // Door in center of the top wall
                             if (x == baseLoc.x + 2 && z == baseLoc.z + 4)
                             {
-                                SpawnThing(doorDef, woodLog, c, map);
+                                SpawnThing(doorDef, woodLog, c, map, faction);
                             }
                             else
                             {
-                                SpawnThing(wallDef, woodLog, c, map);
+                                SpawnThing(wallDef, woodLog, c, map, faction);
                             }
                         }
                         else
@@ -86,6 +97,10 @@ namespace RimSynapse.RegionsAndTerritories
                 IntVec3 bedLoc = baseLoc + new IntVec3(1, 0, 1);
                 ClearBlockers(bedLoc, map);
                 Thing bedThing = ThingMaker.MakeThing(bedDef, woodLog);
+                if (faction != null)
+                {
+                    bedThing.SetFaction(faction);
+                }
                 SetQualityAndCondition(bedThing);
                 GenSpawn.Spawn(bedThing, bedLoc, map, Rot4.North);
                 Building_Bed bed = bedThing as Building_Bed;
@@ -94,13 +109,17 @@ namespace RimSynapse.RegionsAndTerritories
                 IntVec3 chairLoc = baseLoc + new IntVec3(3, 0, 1);
                 ClearBlockers(chairLoc, map);
                 Thing chairThing = ThingMaker.MakeThing(chairDef, woodLog);
+                if (faction != null)
+                {
+                    chairThing.SetFaction(faction);
+                }
                 SetQualityAndCondition(chairThing);
                 GenSpawn.Spawn(chairThing, chairLoc, map, Rot4.North);
 
                 // Campfire outside (near the door)
                 IntVec3 campfireLoc = new IntVec3(baseLoc.x + 2, 0, baseLoc.z + 6);
                 ClearBlockers(campfireLoc, map);
-                SpawnThing(campfireDef, null, campfireLoc, map);
+                SpawnThing(campfireDef, null, campfireLoc, map, faction);
 
                 System.Random random = new System.Random(baseLoc.x ^ baseLoc.z);
                 bool spawnPen = random.NextDouble() < 0.5;
@@ -124,11 +143,11 @@ namespace RimSynapse.RegionsAndTerritories
                             {
                                 if (x == baseLoc.x + 4 && z == baseLoc.z + 9)
                                 {
-                                    SpawnThing(fenceGateDef, woodLog, c, map);
+                                    SpawnThing(fenceGateDef, woodLog, c, map, faction);
                                 }
                                 else
                                 {
-                                    SpawnThing(fenceDef, woodLog, c, map);
+                                    SpawnThing(fenceDef, woodLog, c, map, faction);
                                 }
                             }
                         }
@@ -138,7 +157,7 @@ namespace RimSynapse.RegionsAndTerritories
                     {
                         IntVec3 markerLoc = new IntVec3(baseLoc.x + 3, 0, baseLoc.z + 12);
                         ClearBlockers(markerLoc, map);
-                        SpawnThing(penMarkerDef, woodLog, markerLoc, map);
+                        SpawnThing(penMarkerDef, woodLog, markerLoc, map, faction);
                     }
                 }
                 else
@@ -212,11 +231,11 @@ namespace RimSynapse.RegionsAndTerritories
                             // Door in the center of the 9-length wall (at bottom, z = baseLoc.z)
                             if (x == baseLoc.x + 4 && z == baseLoc.z)
                             {
-                                SpawnThing(doorDef, woodLog, c, map);
+                                SpawnThing(doorDef, woodLog, c, map, faction);
                             }
                             else
                             {
-                                SpawnThing(wallDef, woodLog, c, map);
+                                SpawnThing(wallDef, woodLog, c, map, faction);
                             }
                         }
                         else
@@ -239,6 +258,10 @@ namespace RimSynapse.RegionsAndTerritories
                     ClearBlockers(bLoc + new IntVec3(0, 0, 1), map);
 
                     Thing bedThing = ThingMaker.MakeThing(bedDef, woodLog);
+                    if (faction != null)
+                    {
+                        bedThing.SetFaction(faction);
+                    }
                     SetQualityAndCondition(bedThing);
                     GenSpawn.Spawn(bedThing, bLoc, map, Rot4.North);
                     
@@ -251,7 +274,7 @@ namespace RimSynapse.RegionsAndTerritories
                 // Campfire outside (near the door)
                 IntVec3 campfireLoc = new IntVec3(baseLoc.x + 4, 0, baseLoc.z - 2);
                 ClearBlockers(campfireLoc, map);
-                SpawnThing(campfireDef, null, campfireLoc, map);
+                SpawnThing(campfireDef, null, campfireLoc, map, faction);
 
                 // Spawn residents for barracks (each gets assigned to one of the 4 beds)
                 for (int bIndex = 0; bIndex < barracksBeds.Count; bIndex++)
@@ -309,7 +332,63 @@ namespace RimSynapse.RegionsAndTerritories
                 faction: faction,
                 context: PawnGenerationContext.NonPlayer
             );
-            Pawn pawn = PawnGenerator.GeneratePawn(request);
+
+            // Attempt to generate a pawn capable of growing and cooking
+            Pawn pawn = null;
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                pawn = PawnGenerator.GeneratePawn(request);
+                if (pawn != null && pawn.story != null &&
+                    !pawn.WorkTypeIsDisabled(DefDatabase<WorkTypeDef>.GetNamed("Growing")) &&
+                    !pawn.WorkTypeIsDisabled(DefDatabase<WorkTypeDef>.GetNamed("Cooking")))
+                {
+                    break;
+                }
+            }
+            if (pawn == null)
+            {
+                pawn = PawnGenerator.GeneratePawn(request);
+            }
+
+            // Customize skills and passions
+            if (pawn.skills != null)
+            {
+                var plantsSkill = pawn.skills.GetSkill(SkillDefOf.Plants);
+                if (plantsSkill != null)
+                {
+                    plantsSkill.Level = Math.Max(plantsSkill.Level, Rand.RangeInclusive(6, 12));
+                    plantsSkill.passion = Passion.Major;
+                }
+
+                var cookingSkill = pawn.skills.GetSkill(SkillDefOf.Cooking);
+                if (cookingSkill != null)
+                {
+                    cookingSkill.Level = Math.Max(cookingSkill.Level, Rand.RangeInclusive(6, 12));
+                    cookingSkill.passion = Passion.Major;
+                }
+
+                var animalsSkill = pawn.skills.GetSkill(SkillDefOf.Animals);
+                if (animalsSkill != null)
+                {
+                    animalsSkill.Level = Math.Max(animalsSkill.Level, Rand.RangeInclusive(6, 12));
+                    animalsSkill.passion = Passion.Major;
+                }
+            }
+
+            // Spawn initial food inventory
+            if (pawn.inventory != null)
+            {
+                Thing meals = ThingMaker.MakeThing(ThingDefOf.MealSimple);
+                meals.stackCount = Rand.RangeInclusive(5, 10);
+                pawn.inventory.innerContainer.TryAdd(meals);
+            }
+
+            // Set isResident = true in Core component
+            var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+            if (coreComp != null)
+            {
+                coreComp.isResident = true;
+            }
 
             GenSpawn.Spawn(pawn, spawnLoc, map);
 
@@ -388,10 +467,14 @@ namespace RimSynapse.RegionsAndTerritories
             }
         }
 
-        private static void SpawnThing(ThingDef def, ThingDef stuff, IntVec3 cell, Map map)
+        private static void SpawnThing(ThingDef def, ThingDef stuff, IntVec3 cell, Map map, Faction faction = null)
         {
             if (def == null) return;
             Thing thing = ThingMaker.MakeThing(def, stuff);
+            if (faction != null)
+            {
+                thing.SetFaction(faction);
+            }
             GenSpawn.Spawn(thing, cell, map);
         }
     }
