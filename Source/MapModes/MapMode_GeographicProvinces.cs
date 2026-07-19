@@ -29,6 +29,8 @@ namespace RimSynapse.RegionsAndTerritories
             var regionManager = Find.World.GetComponent<SynapseRegionManager>();
             if (regionManager == null) return;
 
+            regionManager.RecalculateProvinceOwners();
+
             foreach (var province in regionManager.Provinces)
             {
                 if (province.tiles.Count == 0) continue;
@@ -84,11 +86,11 @@ namespace RimSynapse.RegionsAndTerritories
 
                     if (factions.Count == 1)
                     {
-                        ownerString = "Domain of: " + factions[0].Name;
+                        ownerString = "Domain of: " + TextureUtility.GetFactionDisplayName(factions[0]);
                     }
                     else if (factions.Count > 1)
                     {
-                        ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + f.Name));
+                        ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + TextureUtility.GetFactionDisplayName(f)));
                     }
                 }
 
@@ -140,11 +142,11 @@ namespace RimSynapse.RegionsAndTerritories
 
                 if (factions.Count == 1)
                 {
-                    ownerString = "Domain of: " + factions[0].Name;
+                    ownerString = "Domain of: " + TextureUtility.GetFactionDisplayName(factions[0]);
                 }
                 else if (factions.Count > 1)
                 {
-                    ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + f.Name));
+                    ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + TextureUtility.GetFactionDisplayName(f)));
                 }
             }
 

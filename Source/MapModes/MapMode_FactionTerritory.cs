@@ -67,7 +67,7 @@ namespace RimSynapse.RegionsAndTerritories
                     }
 
                     string goodwillStr = faction.IsPlayer ? "N/A (Player)" : $"{faction.PlayerGoodwill.ToStringWithSign()} ({faction.PlayerRelationKind.GetLabel()})";
-                    ownerString = "Territory: " + faction.Name + "\nFaction type: " + faction.def.LabelCap + $"\nGoodwill: {goodwillStr}";
+                    ownerString = "Territory: " + TextureUtility.GetFactionDisplayName(faction) + "\nFaction type: " + faction.def.LabelCap + $"\nGoodwill: {goodwillStr}";
                 }
                 else
                 {
@@ -92,7 +92,7 @@ namespace RimSynapse.RegionsAndTerritories
                     }
 
                     borderColor = new Color(0.7f, 0.7f, 0.7f, 0.9f);
-                    ownerString = "Contested Territory\nClaimed by:\n" + string.Join("\n", factions.Select(f => $"- {f.Name} ({f.def.LabelCap})"));
+                    ownerString = "Contested Territory\nClaimed by:\n" + string.Join("\n", factions.Select(f => $"- {TextureUtility.GetFactionDisplayName(f)} ({f.def.LabelCap})"));
                 }
 
                 if (ShaderDatabase.MetaOverlay != null && BaseContent.WhiteTex != null)

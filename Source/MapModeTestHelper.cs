@@ -46,6 +46,27 @@ namespace RimSynapse.RegionsAndTerritories
                 {
                     Log.Error("[MapModeTestHelper] MapModeComponent.Instance is null!");
                 }
+
+                // Run Empires integration tests
+                var fcAssembly = System.AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == "Empire");
+                if (fcAssembly != null)
+                {
+                    Log.Warning("[MapModeTestHelper] Running FactionColonies unit/integration tests...");
+                    var runnerType = fcAssembly.GetType("FactionColonies.EmpireTestRunner");
+                    if (runnerType != null)
+                    {
+                        var runTestsMethod = runnerType.GetMethod("RunTests", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (runTestsMethod != null)
+                        {
+                            Log.Warning("[MapModeTestHelper] Running standard tests...");
+                            try { runTestsMethod.Invoke(null, new object[] { null, false }); } catch (System.Exception ex) { Log.Error("[MapModeTestHelper] Standard tests failed: " + ex); }
+                            
+                            Log.Warning("[MapModeTestHelper] Running destructive tests...");
+                            try { runTestsMethod.Invoke(null, new object[] { null, true }); } catch (System.Exception ex) { Log.Error("[MapModeTestHelper] Destructive tests failed: " + ex); }
+                        }
+                    }
+                }
             }
         }
     }

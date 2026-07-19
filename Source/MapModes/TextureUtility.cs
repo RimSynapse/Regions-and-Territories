@@ -45,5 +45,46 @@ namespace RimSynapse.RegionsAndTerritories
             readableText.Apply();
             return readableText;
         }
+
+        public static string GetFactionDisplayName(RimWorld.Faction faction)
+        {
+            if (faction == null) return "Unknown";
+
+            if (faction.def.defName == "PColony")
+            {
+                try
+                {
+                    var findFcType = GenTypes.GetTypeInAnyAssembly("FactionColonies.FindFC");
+                    if (findFcType != null)
+                    {
+                        var factionCompProp = findFcType.GetProperty("FactionComp", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (factionCompProp != null)
+                        {
+                            var factionComp = factionCompProp.GetValue(null);
+                            if (factionComp != null)
+                            {
+                                var nameField = factionComp.GetType().GetField("name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (nameField != null)
+                                {
+                                    string customName = nameField.GetValue(factionComp) as string;
+                                    if (!customName.NullOrEmpty() && customName != "Player Faction")
+                                    {
+                                        return customName;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fallback
+                }
+
+                return "Player's Empire";
+            }
+
+            return faction.Name;
+        }
     }
 }

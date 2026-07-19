@@ -8,7 +8,7 @@ namespace RimSynapse.RegionsAndTerritories
 {
     public static class PopulationDensityUtility
     {
-        private struct QueueEntry
+        public struct QueueEntry
         {
             public PlanetTile tile;
             public float multiplier;
@@ -180,7 +180,7 @@ namespace RimSynapse.RegionsAndTerritories
             return basePop + random.Next(-10, 20);
         }
 
-        private static float GetStepMultiplier(PlanetTile fromTile, PlanetTile toTile)
+        public static float GetStepMultiplier(PlanetTile fromTile, PlanetTile toTile)
         {
             if (Find.WorldGrid == null) return 0f;
 

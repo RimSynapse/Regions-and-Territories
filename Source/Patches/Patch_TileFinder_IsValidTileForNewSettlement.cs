@@ -25,17 +25,48 @@ namespace RimSynapse.RegionsAndTerritories.Patches
 
             int tileId = tile.tileId;
             int provinceId = regionManager.GetProvinceId(tileId);
-            if (provinceId != -1)
+            if (provinceId == -1) return;
+
+            var province = regionManager.Provinces.FirstOrDefault(p => p.id == provinceId);
+            if (province == null) return;
+
+            // 1. Found a claimed region, block settling!
+            if (province.owningFactionIds.Any())
             {
-                var province = regionManager.Provinces.FirstOrDefault(p => p.id == provinceId);
-                if (province != null && province.owningFactionIds.Any())
+                __result = false;
+                reason?.AppendLine("Cannot settle here: This region is claimed by another faction.");
+                return;
+            }
+
+            // 2. Sequential Expansion constraint: must be adjacent to existing territory if we have one
+            var playerBases = Find.WorldObjects.AllWorldObjects
+                .Where(obj => obj.Faction != null && (obj.Faction.IsPlayer || obj.GetType().Name == "WorldSettlementFC"))
+                .ToList();
+
+            if (playerBases.Any())
+            {
+                bool hasFoothold = false;
+                foreach (var pb in playerBases)
                 {
-                    // Found a claimed region, block settling!
-                    __result = false;
-                    if (reason != null)
+                    int pbProvinceId = regionManager.GetProvinceId(pb.Tile);
+                    if (pbProvinceId == provinceId)
                     {
-                        reason.AppendLine("Cannot settle here: This region is claimed by another faction.");
+                        hasFoothold = true;
+                        break;
                     }
+                    var pbProvince = regionManager.Provinces.FirstOrDefault(p => p.id == pbProvinceId);
+                    if (pbProvince != null && regionManager.AreProvincesAdjacent(pbProvince, province))
+                    {
+                        hasFoothold = true;
+                        break;
+                    }
+                }
+
+                if (!hasFoothold)
+                {
+                    __result = false;
+                    reason?.AppendLine("Cannot settle here: This region is too far from your existing territory. You must expand to adjacent regions first.");
+                    return;
                 }
             }
         }

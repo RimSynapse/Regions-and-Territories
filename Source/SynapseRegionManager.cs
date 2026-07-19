@@ -12,6 +12,38 @@ namespace RimSynapse.RegionsAndTerritories
     {
         private List<GeographicProvince> provinces = new List<GeographicProvince>();
         private int[] tileToProvinceId;
+        private Dictionary<int, int> settlementPlacementOrder = new Dictionary<int, int>();
+
+        public int GetSettlementPlacementOrder(int tileId)
+        {
+            if (settlementPlacementOrder != null && settlementPlacementOrder.TryGetValue(tileId, out int order))
+            {
+                return order;
+            }
+            return -1;
+        }
+
+        public void SetSettlementPlacementOrder(int tileId, int order)
+        {
+            if (settlementPlacementOrder == null)
+            {
+                settlementPlacementOrder = new Dictionary<int, int>();
+            }
+            settlementPlacementOrder[tileId] = order;
+        }
+
+        public int GetNextPlacementOrderForFaction(Faction faction)
+        {
+            int count = 0;
+            foreach (var obj in Find.WorldObjects.AllWorldObjects)
+            {
+                if ((obj is Settlement || obj.GetType().Name == "WorldSettlementFC") && obj.Faction == faction)
+                {
+                    count++;
+                }
+            }
+            return count + 1;
+        }
 
         public List<GeographicProvince> Provinces
         {
@@ -68,6 +100,12 @@ namespace RimSynapse.RegionsAndTerritories
             if (provinces == null)
             {
                 provinces = new List<GeographicProvince>();
+            }
+
+            Scribe_Collections.Look(ref settlementPlacementOrder, "settlementPlacementOrder", LookMode.Value, LookMode.Value);
+            if (settlementPlacementOrder == null)
+            {
+                settlementPlacementOrder = new Dictionary<int, int>();
             }
 
             List<int> tempList = null;
@@ -1168,13 +1206,59 @@ namespace RimSynapse.RegionsAndTerritories
                     if (province != null)
                     {
                         string fid = s.Faction.GetUniqueLoadID();
+
+                        // If it's an Empire settlement, map it to the custom Empire faction (PColony) if available
+                        if (s.GetType().Name.Contains("WorldSettlementFC"))
+                        {
+                            try
+                            {
+                                var findFcType = GenTypes.GetTypeInAnyAssembly("FactionColonies.FindFC");
+                                if (findFcType != null)
+                                {
+                                    var empireFactionProp = findFcType.GetProperty("EmpireFaction", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                                    if (empireFactionProp != null)
+                                    {
+                                        var empireFactionObj = empireFactionProp.GetValue(null) as Faction;
+                                        if (empireFactionObj != null)
+                                        {
+                                            fid = empireFactionObj.GetUniqueLoadID();
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.ErrorOnce($"[RimSynapse-RegionsAndTerritories] Error resolving EmpireFaction in RecalculateProvinceOwners: {ex}", 998822);
+                            }
+                        }
+
                         if (!province.owningFactionIds.Contains(fid))
                         {
                             province.owningFactionIds.Add(fid);
+                            Log.Message($"[RT-Debug] Province '{province.name}' (ID {province.id}) claimed by faction ID '{fid}' (Name: '{s.Faction.Name}', DefName: '{s.Faction.def.defName}', Type: '{s.GetType().FullName}') from settlement '{s.Name}' at tile {s.Tile}");
                         }
                     }
                 }
             }
+        }
+
+        public bool AreProvincesAdjacent(GeographicProvince a, GeographicProvince b)
+        {
+            if (a == null || b == null) return false;
+            if (a.id == b.id) return true;
+
+            // Check if any tile in 'a' shares a neighbor with any tile in 'b'
+            foreach (int tileA in a.tiles)
+            {
+                foreach (int tileB in b.tiles)
+                {
+                    if (Find.WorldGrid.IsNeighbor(tileA, tileB))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
     }
 }
