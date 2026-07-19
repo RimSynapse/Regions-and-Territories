@@ -296,7 +296,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 for (int t = 0; t < totalTiles; t++)
                 {
                     Tile tileData = worldGrid[t];
-                    if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || (tileData.PrimaryBiome != null && tileData.PrimaryBiome.impassable))
+                    if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || (tileData.PrimaryBiome != null && (tileData.PrimaryBiome.impassable || tileData.PrimaryBiome.defName == "SeaIce")))
                     {
                         tileScores[t] = -9999f;
                         continue;

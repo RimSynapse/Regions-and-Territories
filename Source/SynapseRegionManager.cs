@@ -338,7 +338,9 @@ namespace RimSynapse.RegionsAndTerritories
                 bool hasFeatures = ChunkHasNaturalFeatures(landPocket);
                 int maxAllowed = hasFeatures ? maxWithFeatures : maxNoFeatures;
 
-                if (landPocket.Count <= maxAllowed)
+                int usableCount = landPocket.Count(t => IsTileUsable(t));
+
+                if (usableCount <= maxAllowed)
                 {
                     GeographicProvince domain = new GeographicProvince(provinceIdCounter);
                     domain.tiles = landPocket.ToList();
@@ -700,7 +702,7 @@ namespace RimSynapse.RegionsAndTerritories
         private List<List<int>> SplitChunkByVoronoi(List<int> chunk)
         {
             HashSet<int> chunkSet = new HashSet<int>(chunk);
-            int size = chunk.Count;
+            int size = chunk.Count(t => IsTileUsable(t));
 
             float targetSize = (FactionPlacementSettings.minRegionSize + FactionPlacementSettings.maxRegionSize) / 2f;
             int k = Mathf.CeilToInt((float)size / targetSize);
@@ -930,7 +932,7 @@ namespace RimSynapse.RegionsAndTerritories
                         {
                             if (provinceMap.TryGetValue(kvp.Key, out var neighborProv))
                             {
-                                if (neighborProv.tiles.Count + p.tiles.Count <= FactionPlacementSettings.maxRegionSize + 50)
+                                if (neighborProv.tiles.Count(t => IsTileUsable(t)) + p.tiles.Count(t => IsTileUsable(t)) <= FactionPlacementSettings.maxRegionSize + 50)
                                 {
                                     bestNeighbor = neighborProv;
                                     break;
@@ -1259,6 +1261,16 @@ namespace RimSynapse.RegionsAndTerritories
                 }
             }
             return false;
+        }
+
+        public static bool IsTileUsable(int tileId)
+        {
+            if (Find.WorldGrid == null) return false;
+            Tile tileData = Find.WorldGrid[tileId];
+            if (tileData == null) return false;
+            if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable) return false;
+            if (tileData.PrimaryBiome != null && (tileData.PrimaryBiome.impassable || tileData.PrimaryBiome.defName == "SeaIce")) return false;
+            return true;
         }
     }
 }

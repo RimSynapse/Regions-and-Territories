@@ -47,7 +47,7 @@ namespace RimSynapse.RegionsAndTerritories
             for (int i = 0; i < count; i++)
             {
                 Tile tileData = Find.WorldGrid[i];
-                if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || tileData.PrimaryBiome == null || tileData.PrimaryBiome.impassable)
+                if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || tileData.PrimaryBiome == null || tileData.PrimaryBiome.impassable || tileData.PrimaryBiome.defName == "SeaIce")
                 {
                     continue;
                 }
