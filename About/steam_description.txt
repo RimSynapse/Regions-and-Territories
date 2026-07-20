@@ -14,10 +14,9 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 
 ---
 
-[h2]Changelog (v0.5.0)[/h2]
+[h2]Changelog (v0.5.1)[/h2]
 [list]
-[*] [b]Odyssey DLC Compatibility:[/b] Solved the duplicate faction placement issue by short-circuiting non-surface layers. Space and Orbit factions (like the Traders Guild) now spawn correctly in space, while terrestrial factions are cleanly placed into geographic domains.
-[*] [b]Faction Layer Filtering:[/b] Integrates the game's internal layer constraints (using reflected FactionGenerator.CanExistOnLayer), preventing orbital factions from generating on land.
+[*] [b]NEW: Sea Ice Exclusion:[/b] Excludes Sea Ice tiles from regional size division, population density scoring, and procedural faction territory placement, keeping polar regions barren as intended.
 [/list]
 
 ---
