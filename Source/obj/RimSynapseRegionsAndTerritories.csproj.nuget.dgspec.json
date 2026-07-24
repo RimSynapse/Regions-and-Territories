@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj": {}
+    "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj": {}
   },
   "projects": {
-    "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj": {
+    "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
+        "projectUniqueName": "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
         "projectName": "RimSynapseRegionsAndTerritories",
-        "projectPath": "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
+        "projectPath": "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\RimSynapseRegionsAndTerritories.csproj",
         "packagesPath": "C:\\Users\\sealt\\.nuget\\packages\\",
-        "outputPath": "D:\\github\\rimsynapse\\Regions-and-Territories\\Source\\obj\\",
+        "outputPath": "d:\\github\\rimsynapse\\Regions-and-Territories\\Source\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\sealt\\AppData\\Roaming\\NuGet\\NuGet.Config"

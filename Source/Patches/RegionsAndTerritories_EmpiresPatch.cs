@@ -477,6 +477,121 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             }
             return totalValue;
         }
+
+        public static bool IsCity(WorldObject obj)
+        {
+            if (obj == null) return false;
+            
+            if (obj is Settlement)
+            {
+                string typeName = obj.GetType().FullName;
+                if (typeName.IndexOf("outpost", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return false;
+                return true;
+            }
+            
+            Type type = obj.GetType();
+            while (type != null)
+            {
+                if (type.FullName == "Outposts.Outpost")
+                    return false;
+                type = type.BaseType;
+            }
+            
+            if (obj.GetType().FullName == "FactionColonies.WorldSettlementFC")
+            {
+                var defProp = obj.GetType().GetProperty("def", BindingFlags.Public | BindingFlags.Instance);
+                if (defProp != null)
+                {
+                    var defVal = defProp.GetValue(obj);
+                    if (defVal != null)
+                    {
+                        return IsCityDef(defVal);
+                    }
+                }
+            }
+            
+            string objTypeName = obj.GetType().FullName;
+            if (objTypeName.IndexOf("outpost", StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+            
+            return false;
+        }
+
+        public static bool IsCityDef(object settlementdef)
+        {
+            if (settlementdef == null) return false;
+            string defName = GetDefNameSafe(settlementdef);
+            if (defName != null && defName.IndexOf("outpost", StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+            
+            var labelField = settlementdef.GetType().GetField("label", BindingFlags.Public | BindingFlags.Instance);
+            if (labelField != null)
+            {
+                string label = labelField.GetValue(settlementdef) as string;
+                if (label != null && label.IndexOf("outpost", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return false;
+            }
+            
+            return true;
+        }
+
+        public static Faction GetRegionOwner(int tileId)
+        {
+            if (Find.World == null) return null;
+            var regionManager = Find.World.GetComponent<SynapseRegionManager>();
+            if (regionManager == null) return null;
+            
+            var province = regionManager.GetProvinceForTile(tileId);
+            if (province == null) return null;
+            
+            foreach (int t in province.tiles)
+            {
+                var objects = Find.WorldObjects.ObjectsAt(t);
+                foreach (var obj in objects)
+                {
+                    if (IsCity(obj) && obj.Faction != null)
+                    {
+                        return obj.Faction;
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static Faction GetPlayerFaction()
+        {
+            var findFcType = GenTypes.GetTypeInAnyAssembly("FactionColonies.FindFC");
+            if (findFcType != null)
+            {
+                var compProp = findFcType.GetProperty("FactionComp", BindingFlags.Public | BindingFlags.Static);
+                if (compProp != null)
+                {
+                    var comp = compProp.GetValue(null);
+                    if (comp != null)
+                    {
+                        var factionProp = comp.GetType().GetProperty("faction", BindingFlags.Public | BindingFlags.Instance);
+                        if (factionProp != null)
+                        {
+                            var f = factionProp.GetValue(comp) as Faction;
+                            if (f != null) return f;
+                        }
+                    }
+                }
+            }
+            return Faction.OfPlayer;
+        }
+
+        public static void VOE_CanSpawnOnWithExt_Postfix(object ext, PlanetTile tileIdx, System.Collections.Generic.IEnumerable<Pawn> pawns, ref string __result)
+        {
+            if (!string.IsNullOrEmpty(__result)) return;
+
+            Faction owner = GetRegionOwner(tileIdx.tileId);
+            if (owner != null && owner != Faction.OfPlayer)
+            {
+                __result = "This region is owned by another faction.";
+            }
+        }
     }
 
     public static class Patch_WorldTileChecker_IsValidTileForNewSettlement
@@ -491,12 +606,23 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPrefix]
         public static bool Prefix(PlanetTile tile, object settlementdef, ref bool __result, StringBuilder reason)
         {
-            // For the player, allow settling on ANY tile that is valid, allowed by layer, and not occupied
             if (!tile.Valid)
             {
                 reason?.Append("FCSelectedInvalidTile".Translate());
                 __result = false;
                 return false;
+            }
+
+            Faction placingFaction = RegionsAndTerritories_EmpiresPatch.GetPlayerFaction();
+            if (placingFaction != null)
+            {
+                Faction owner = RegionsAndTerritories_EmpiresPatch.GetRegionOwner(tile.tileId);
+                if (owner != null && owner != placingFaction)
+                {
+                    reason?.Append("This region is owned by another faction.");
+                    __result = false;
+                    return false;
+                }
             }
 
             if (settlementdef != null)
@@ -719,6 +845,43 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 Log.Error("Error in CreateSettlementPerResource patch prefix: " + ex);
             }
             return false; // Skip original
+        }
+    }
+
+    [HarmonyPatch(typeof(WorldGrid), nameof(WorldGrid.OverlayRoad))]
+    public static class Patch_WorldGrid_OverlayRoad
+    {
+        [HarmonyPrefix]
+        public static bool Prefix(PlanetTile fromTile, PlanetTile toTile, RoadDef roadDef)
+        {
+            if (Current.ProgramState != ProgramState.Playing)
+                return true;
+
+            try
+            {
+                Faction playerFaction = RegionsAndTerritories_EmpiresPatch.GetPlayerFaction();
+                if (playerFaction == null) return true;
+
+                int from = fromTile.tileId;
+                int to = toTile.tileId;
+
+                Faction ownerFrom = RegionsAndTerritories_EmpiresPatch.GetRegionOwner(from);
+                if (ownerFrom != null && ownerFrom != playerFaction)
+                {
+                    return false; // Block road segment overlay
+                }
+
+                Faction ownerTo = RegionsAndTerritories_EmpiresPatch.GetRegionOwner(to);
+                if (ownerTo != null && ownerTo != playerFaction)
+                {
+                    return false; // Block road segment overlay
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.ErrorOnce($"[RimSynapse-RegionsAndTerritories] Error in Patch_WorldGrid_OverlayRoad: {ex}", 991823);
+            }
+            return true;
         }
     }
 }

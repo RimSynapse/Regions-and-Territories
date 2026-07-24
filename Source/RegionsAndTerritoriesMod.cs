@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Linq;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -25,6 +26,7 @@ namespace RimSynapse.RegionsAndTerritories
 
             TryRegisterPopulationDelegate();
             TryPatchEmpires(harmony);
+            TryPatchVOE(harmony);
         }
 
         private void TryRegisterPopulationDelegate()
@@ -177,6 +179,37 @@ namespace RimSynapse.RegionsAndTerritories
             catch (Exception ex)
             {
                 Log.Error($"[RimSynapse-RegionsAndTerritories] Error dynamically patching Empires: {ex.Message}");
+            }
+        }
+
+        private void TryPatchVOE(Harmony harmony)
+        {
+            try
+            {
+                var type = GenTypes.GetTypeInAnyAssembly("Outposts.Utils");
+                if (type != null)
+                {
+                    var target = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .FirstOrDefault(m => m.Name == "CanSpawnOnWithExt");
+                    if (target != null)
+                    {
+                        var postfix = new HarmonyMethod(typeof(Patches.RegionsAndTerritories_EmpiresPatch), nameof(Patches.RegionsAndTerritories_EmpiresPatch.VOE_CanSpawnOnWithExt_Postfix));
+                        harmony.Patch(target, postfix: postfix);
+                        Log.Message("[RimSynapse-RegionsAndTerritories] Dynamically patched Outposts.Utils.CanSpawnOnWithExt successfully.");
+                    }
+                    else
+                    {
+                        Log.Warning("[RimSynapse-RegionsAndTerritories] Could not find CanSpawnOnWithExt method in Outposts.Utils.");
+                    }
+                }
+                else
+                {
+                    Log.Message("[RimSynapse-RegionsAndTerritories] Vanilla Outposts Expanded not detected. Skipping VOE dynamic patching.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[RimSynapse-RegionsAndTerritories] Error dynamically patching VOE: {ex.Message}");
             }
         }
     }

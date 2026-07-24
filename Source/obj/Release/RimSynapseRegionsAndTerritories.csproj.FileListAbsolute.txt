@@ -1,0 +1,5 @@
+D:\github\rimsynapse\Regions-and-Territories\Assemblies\RimSynapseRegionsAndTerritories.dll
+D:\github\rimsynapse\Regions-and-Territories\Source\obj\Release\RimSynapseRegionsAndTerritories.csproj.AssemblyReference.cache
+D:\github\rimsynapse\Regions-and-Territories\Source\obj\Release\RimSynapseRegionsAndTerritories.GeneratedMSBuildEditorConfig.editorconfig
+D:\github\rimsynapse\Regions-and-Territories\Source\obj\Release\RimSynapseRegionsAndTerritories.csproj.CoreCompileInputs.cache
+D:\github\rimsynapse\Regions-and-Territories\Source\obj\Release\RimSynapseRegionsAndTerritories.dll

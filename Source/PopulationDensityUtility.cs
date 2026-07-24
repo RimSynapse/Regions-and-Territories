@@ -20,6 +20,45 @@ namespace RimSynapse.RegionsAndTerritories
             }
         }
 
+        public struct PopSource
+        {
+            public int tileId;
+            public int population;
+        }
+
+        public static bool IsVoeOutpost(WorldObject obj)
+        {
+            if (obj == null) return false;
+            System.Type type = obj.GetType();
+            while (type != null)
+            {
+                if (type.FullName == "Outposts.Outpost")
+                    return true;
+                type = type.BaseType;
+            }
+            return false;
+        }
+
+        public static int GetVoeOutpostPopulation(WorldObject obj)
+        {
+            if (obj == null) return 0;
+            var prop = obj.GetType().GetProperty("PawnCount", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (prop != null)
+            {
+                return (int)prop.GetValue(obj);
+            }
+            var field = obj.GetType().GetField("occupants", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            if (field != null)
+            {
+                var list = field.GetValue(obj) as System.Collections.ICollection;
+                if (list != null)
+                {
+                    return list.Count;
+                }
+            }
+            return 0;
+        }
+
         private static int[] cachedTilePopulations = null;
         private static bool cacheDirty = true;
 
@@ -66,68 +105,93 @@ namespace RimSynapse.RegionsAndTerritories
                 }
             }
 
-            // 2. Settlement propagation
+            // 2. Collection of all population sources (Settlements and VOE Outposts)
+            var popSources = new List<PopSource>();
+
             var settlements = Find.WorldObjects?.Settlements;
             if (settlements != null)
             {
-                var settlementList = new List<Settlement>(settlements);
-                foreach (var settlement in settlementList)
+                foreach (var settlement in settlements)
                 {
-                    int settlementPop = GetSettlementPopulation(settlement);
-                    if (settlementPop <= 0) continue;
-
-                    int startTileId = settlement.Tile;
-
-                    PlanetTile startPlanetTile = PlanetTile.Invalid;
-                    var tempNeighbors = new List<PlanetTile>();
-                    Find.WorldGrid.GetTileNeighbors(startTileId, tempNeighbors);
-                    if (tempNeighbors.Any())
+                    int pop = GetSettlementPopulation(settlement);
+                    if (pop > 0)
                     {
-                        var doubleNeighbors = new List<PlanetTile>();
-                        Find.WorldGrid.GetTileNeighbors(tempNeighbors[0].tileId, doubleNeighbors);
-                        foreach (var t in doubleNeighbors)
+                        popSources.Add(new PopSource { tileId = settlement.Tile, population = pop });
+                    }
+                }
+            }
+
+            var allWorldObjects = Find.WorldObjects?.AllWorldObjects;
+            if (allWorldObjects != null)
+            {
+                foreach (var obj in allWorldObjects)
+                {
+                    if (obj == null) continue;
+                    if (IsVoeOutpost(obj))
+                    {
+                        int pop = GetVoeOutpostPopulation(obj);
+                        if (pop > 0)
                         {
-                            if (t.tileId == startTileId)
-                            {
-                                startPlanetTile = t;
-                                break;
-                            }
+                            popSources.Add(new PopSource { tileId = obj.Tile, population = pop });
                         }
                     }
+                }
+            }
 
-                    if (startPlanetTile == PlanetTile.Invalid) continue;
+            // 3. Population propagation from sources
+            foreach (var source in popSources)
+            {
+                int startTileId = source.tileId;
 
-                    var visited = new HashSet<int>();
-                    var queue = new Queue<QueueEntry>();
-
-                    queue.Enqueue(new QueueEntry(startPlanetTile, 1.0f));
-                    visited.Add(startTileId);
-
-                    while (queue.Count > 0)
+                PlanetTile startPlanetTile = PlanetTile.Invalid;
+                var tempNeighbors = new List<PlanetTile>();
+                Find.WorldGrid.GetTileNeighbors(startTileId, tempNeighbors);
+                if (tempNeighbors.Any())
+                {
+                    var doubleNeighbors = new List<PlanetTile>();
+                    Find.WorldGrid.GetTileNeighbors(tempNeighbors[0].tileId, doubleNeighbors);
+                    foreach (var t in doubleNeighbors)
                     {
-                        var current = queue.Dequeue();
-                        PlanetTile currentTile = current.tile;
-                        int currentTileId = currentTile.tileId;
-                        float currentMultiplier = current.multiplier;
-
-                        if (currentMultiplier < 0.001f) continue;
-
-                        tempPops[currentTileId] += (settlementPop * currentMultiplier);
-
-                        var neighbors = new List<PlanetTile>();
-                        Find.WorldGrid.GetTileNeighbors(currentTileId, neighbors);
-                        foreach (var neighbor in neighbors)
+                        if (t.tileId == startTileId)
                         {
-                            int neighborId = neighbor.tileId;
-                            if (!visited.Contains(neighborId))
-                            {
-                                visited.Add(neighborId);
+                            startPlanetTile = t;
+                            break;
+                        }
+                    }
+                }
 
-                                float stepMultiplier = GetStepMultiplier(currentTile, neighbor);
-                                if (stepMultiplier > 0f)
-                                {
-                                    queue.Enqueue(new QueueEntry(neighbor, currentMultiplier * stepMultiplier));
-                                }
+                if (startPlanetTile == PlanetTile.Invalid) continue;
+
+                var visited = new HashSet<int>();
+                var queue = new Queue<QueueEntry>();
+
+                queue.Enqueue(new QueueEntry(startPlanetTile, 1.0f));
+                visited.Add(startTileId);
+
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    PlanetTile currentTile = current.tile;
+                    int currentTileId = currentTile.tileId;
+                    float currentMultiplier = current.multiplier;
+
+                    if (currentMultiplier < 0.001f) continue;
+
+                    tempPops[currentTileId] += (source.population * currentMultiplier);
+
+                    var neighbors = new List<PlanetTile>();
+                    Find.WorldGrid.GetTileNeighbors(currentTileId, neighbors);
+                    foreach (var neighbor in neighbors)
+                    {
+                        int neighborId = neighbor.tileId;
+                        if (!visited.Contains(neighborId))
+                        {
+                            visited.Add(neighborId);
+
+                            float stepMultiplier = GetStepMultiplier(currentTile, neighbor);
+                            if (stepMultiplier > 0f)
+                            {
+                                queue.Enqueue(new QueueEntry(neighbor, currentMultiplier * stepMultiplier));
                             }
                         }
                     }
