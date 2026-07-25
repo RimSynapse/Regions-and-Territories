@@ -150,6 +150,24 @@ namespace RimSynapse.RegionsAndTerritories
             return tex;
         }
 
+        public override void MapModeOnGUI()
+        {
+            base.MapModeOnGUI();
+            if (Find.World != null)
+            {
+                int mouseTile = GenWorld.MouseTile();
+                if (mouseTile >= 0)
+                {
+                    var regionManager = Find.World.GetComponent<SynapseRegionManager>();
+                    var province = regionManager?.GetProvinceForTile(mouseTile);
+                    if (province != null)
+                    {
+                        UI.RegionalPieChartWindow.DrawHoverWindow(province, Event.current.mousePosition);
+                    }
+                }
+            }
+        }
+
         public override string GetTooltip(int tile)
         {
             if (Find.World == null) return base.GetTooltip(tile);

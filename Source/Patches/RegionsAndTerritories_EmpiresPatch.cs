@@ -586,10 +586,9 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         {
             if (!string.IsNullOrEmpty(__result)) return;
 
-            Faction owner = GetRegionOwner(tileIdx.tileId);
-            if (owner != null && owner != Faction.OfPlayer)
+            if (!OutpostPlacementUtility.CanPlaceOutpostAt(tileIdx.tileId, Faction.OfPlayer, out string reason))
             {
-                __result = "This region is owned by another faction.";
+                __result = reason;
             }
         }
     }

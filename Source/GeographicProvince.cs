@@ -31,6 +31,7 @@ namespace RimSynapse.RegionsAndTerritories
         public string name;
         public BiomeDef primaryBiome;
         public List<string> owningFactionIds = new List<string>();
+        public RegionalOwnershipData ownershipData;
         public ProvinceType provinceType = ProvinceType.Land;
 
         // --- Economics / Demographics ---

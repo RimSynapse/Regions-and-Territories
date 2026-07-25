@@ -1,3 +1,6 @@
+[b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
+[b]Version:[/b] v0.5.1 (Target: RimWorld 1.6)
+
 [h1]RimSynapse - Regions and Territories[/h1]
 [b]Overhauls the world map generation with dynamic geographic province generation, world map overlays, and territory borders.[/b]
 
@@ -41,6 +44,6 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 
 ---
 
-[h2]Open Source & Support[/h2]
+[h2]Open Source and Support[/h2]
 GitHub: [url]https://github.com/RimSynapse/Regions-and-Territories[/url]
 Buy me a coffee: [url]https://buymeacoffee.com/archdukejim[/url]

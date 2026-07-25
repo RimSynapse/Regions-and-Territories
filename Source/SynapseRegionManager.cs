@@ -1190,54 +1190,24 @@ namespace RimSynapse.RegionsAndTerritories
 
         public void RecalculateProvinceOwners()
         {
-            if (Find.WorldObjects == null) return;
+            if (Find.WorldObjects == null || provinces == null) return;
 
             foreach (var province in provinces)
             {
                 province.owningFactionIds.Clear();
-            }
+                province.ownershipData = RegionalOwnershipUtility.CalculateOwnership(province);
 
-            var settlements = Find.WorldObjects.Settlements;
-            if (settlements == null) return;
-
-            foreach (var s in settlements)
-            {
-                if (s.Faction != null)
+                if (province.ownershipData != null && province.ownershipData.factionScores != null)
                 {
-                    GeographicProvince province = GetProvinceForTile(s.Tile);
-                    if (province != null)
+                    foreach (var fs in province.ownershipData.factionScores)
                     {
-                        string fid = s.Faction.GetUniqueLoadID();
-
-                        // If it's an Empire settlement, map it to the custom Empire faction (PColony) if available
-                        if (s.GetType().Name.Contains("WorldSettlementFC"))
+                        if (fs.faction != null && fs.TotalScore > 0.05f)
                         {
-                            try
+                            string fid = fs.faction.GetUniqueLoadID();
+                            if (!province.owningFactionIds.Contains(fid))
                             {
-                                var findFcType = GenTypes.GetTypeInAnyAssembly("FactionColonies.FindFC");
-                                if (findFcType != null)
-                                {
-                                    var empireFactionProp = findFcType.GetProperty("EmpireFaction", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                                    if (empireFactionProp != null)
-                                    {
-                                        var empireFactionObj = empireFactionProp.GetValue(null) as Faction;
-                                        if (empireFactionObj != null)
-                                        {
-                                            fid = empireFactionObj.GetUniqueLoadID();
-                                        }
-                                    }
-                                }
+                                province.owningFactionIds.Add(fid);
                             }
-                            catch (Exception ex)
-                            {
-                                Log.ErrorOnce($"[RimSynapse-RegionsAndTerritories] Error resolving EmpireFaction in RecalculateProvinceOwners: {ex}", 998822);
-                            }
-                        }
-
-                        if (!province.owningFactionIds.Contains(fid))
-                        {
-                            province.owningFactionIds.Add(fid);
-                            Log.Message($"[RT-Debug] Province '{province.name}' (ID {province.id}) claimed by faction ID '{fid}' (Name: '{s.Faction.Name}', DefName: '{s.Faction.def.defName}', Type: '{s.GetType().FullName}') from settlement '{s.Name}' at tile {s.Tile}");
                         }
                     }
                 }
