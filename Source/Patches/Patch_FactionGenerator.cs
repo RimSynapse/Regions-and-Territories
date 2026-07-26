@@ -21,7 +21,11 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 return true;
             }
 
-            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...\n" + new System.Diagnostics.StackTrace().ToString());
+            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...");
+            if (Prefs.DevMode)
+            {
+                Log.Message("[RimSynapse-RegionsAndTerritories] Call site:\n" + new System.Diagnostics.StackTrace());
+            }
 
             World world = Find.World ?? Current.CreatingWorld;
             if (world == null || world.info == null || world.grid == null)
@@ -775,13 +779,18 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         }
     }
 
+    // Tracing-only patches. They change no behaviour and exist purely to show when world
+    // generation reaches these steps, so they stay silent outside dev mode: dumping a full
+    // StackTrace on every world generation is expensive, and the resulting "at ..." frames
+    // are indistinguishable from a real exception when reading Player.log.
     [HarmonyPatch(typeof(WorldGenerator), "GenerateWorld")]
     public static class Patch_WorldGenerator_GenerateWorld
     {
         [HarmonyPrefix]
         public static void Prefix()
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenerator.GenerateWorld PREFIX is executing!");
+            if (!Prefs.DevMode) return;
+            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenerator.GenerateWorld prefix reached.");
         }
     }
 
@@ -791,7 +800,9 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPrefix]
         public static void Prefix()
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh PREFIX is executing!\n" + new System.Diagnostics.StackTrace().ToString());
+            if (!Prefs.DevMode) return;
+            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh prefix reached.\n"
+                + new System.Diagnostics.StackTrace());
         }
     }
 
