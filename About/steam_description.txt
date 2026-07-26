@@ -1,0 +1,68 @@
+[b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
+[b]Version:[/b] v0.5.2 (Target: RimWorld 1.6)
+
+[h1]RimSynapse - Regions and Territories[/h1]
+[b]Overhauls the world map generation with dynamic geographic province generation, world map overlays, and territory borders.[/b]
+
+Regions and Territories divides the globe into dynamic geographic provinces with defined borders, population densities, custom road linkages, and procedurally placed ruins.
+
+---
+
+[h2]Key Features[/h2]
+[list]
+[*] [b]Geographic Domain Mapping:[/b] Splits the world map into dynamic provinces with clear geographic boundaries.
+[*] [b]Faction Territory Overlays:[/b] Displays visual, expandable territory control maps using the Map Mode Framework.
+[*] [b]Procedural Trade Infrastructure:[/b] Dynamically links generated settlements with trade roads and places historical ruins on the world map.
+[/list]
+
+---
+
+[h2]Roadmap[/h2]
+[list]
+[*] [b]0.6 - Agent and Tool Foundation:[/b] An in-game agent that plans and carries out multi-step actions on its own, backed by a growing library of tools it can query for colony, faction and world state.
+[*] [b]0.7 - Logic Externalization:[/b] Retiring hardcoded thresholds so the storyteller reasons about your colony's situation instead of following fixed rules.
+[*] [b]0.8 - Emergent Systems and Content:[/b] Faction archetypes for each DLC, caravans that travel the world map, settlement crises, faction capitals and travelling leaders, and richer colonist social dynamics.
+[/list]
+These ship when they are ready - no dates.
+
+---
+
+[h2]Changelog (v0.5.2)[/h2]
+[list]
+[*] [b]CHANGED - Quieter world generation:[/b] Diagnostic tracing dumped a full stack trace on every world generation, which was slow and looked like an error in the log. It now only logs in Developer Mode.
+[*] [b]Licence:[/b] Now PolyForm Noncommercial 1.0.0. Free to use, modify and share for any noncommercial purpose.
+[/list]
+
+---
+
+[h2]Changelog (v0.5.1)[/h2]
+[list]
+[*] [b]NEW: Sea Ice Exclusion:[/b] Excludes Sea Ice tiles from regional size division, population density scoring, and procedural faction territory placement, keeping polar regions barren as intended.
+[/list]
+
+---
+
+[h2]Compatibility Matrix[/h2]
+[list]
+[*] [b]Royalty DLC:[/b] Compatible
+[*] [b]Ideology DLC:[/b] Compatible
+[*] [b]Biotech DLC:[/b] Compatible
+[*] [b]Anomaly DLC:[/b] Compatible
+[*] [b]Odyssey DLC:[/b] Fully Compatible and Optimized. Space factions are generated on the Orbit layer naturally, and terrestrial factions generate on the Surface layer.
+[*] [b]Map Mode Framework:[/b] Required for the map mode overlays.
+[/list]
+
+---
+
+[h2]Requirements[/h2]
+[list]
+[*] Map Mode Framework
+[*] Harmony
+[/list]
+
+---
+
+[h2]Source Code and Support[/h2]
+GitHub: [url]https://github.com/RimSynapse/Regions-and-Territories[/url]
+Licence: [url=https://polyformproject.org/licenses/noncommercial/1.0.0/]PolyForm Noncommercial License 1.0.0[/url] - free for any noncommercial use.
+Buy me a coffee: [url]https://buymeacoffee.com/archdukejim[/url]

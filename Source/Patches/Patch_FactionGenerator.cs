@@ -21,7 +21,11 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 return true;
             }
 
-            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...\n" + new System.Diagnostics.StackTrace().ToString());
+            Log.Message("[RimSynapse-RegionsAndTerritories] Custom Faction Generation and Placement solver starting...");
+            if (Prefs.DevMode)
+            {
+                Log.Message("[RimSynapse-RegionsAndTerritories] Call site:\n" + new System.Diagnostics.StackTrace());
+            }
 
             World world = Find.World ?? Current.CreatingWorld;
             if (world == null || world.info == null || world.grid == null)
@@ -35,7 +39,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 factions = new List<FactionDef>();
                 foreach (var def in DefDatabase<FactionDef>.AllDefsListForReading)
                 {
-                    if (!def.isPlayer && !def.hidden)
+                    if (!def.isPlayer && !def.hidden && def.defName != "PColony")
                     {
                         factions.Add(def);
                     }
@@ -80,7 +84,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             var canExistOnLayerMethod = typeof(FactionGenerator).GetMethod("CanExistOnLayer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
 
             List<FactionDef> poolToClone = DefDatabase<FactionDef>.AllDefs
-                .Where(f => !f.isPlayer && !f.hidden)
+                .Where(f => !f.isPlayer && !f.hidden && f.defName != "PColony")
                 .Where(f => {
                     if (canExistOnLayerMethod != null)
                     {
@@ -296,7 +300,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 for (int t = 0; t < totalTiles; t++)
                 {
                     Tile tileData = worldGrid[t];
-                    if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || (tileData.PrimaryBiome != null && tileData.PrimaryBiome.impassable))
+                    if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable || (tileData.PrimaryBiome != null && (tileData.PrimaryBiome.impassable || tileData.PrimaryBiome.defName == "SeaIce")))
                     {
                         tileScores[t] = -9999f;
                         continue;
@@ -476,6 +480,9 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                             settlement.Name = SettlementNameGenerator.GenerateSettlementName(settlement);
                             worldObjects.Add(settlement);
 
+                            // Mark the placement order for this settlement
+                            regionManager.SetSettlementPlacementOrder(chosenTile, b + 1);
+
                             factionBases.Add(chosenTile);
                             placedBases.Add(chosenTile);
 
@@ -525,12 +532,60 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         {
             var candidateTiles = province.tiles
                 .Where(t => tileScores.ContainsKey(t) && tileScores[t] > -9999f && !allPlacedBases.Contains(t))
-                .OrderByDescending(t => tileScores[t])
                 .ToList();
 
             if (!candidateTiles.Any()) return -1;
+            if (candidateTiles.Count == 1) return candidateTiles[0];
 
-            foreach (var tile in candidateTiles)
+            // Compute province centroid
+            Vector3 centroid = Vector3.zero;
+            foreach (int t in province.tiles)
+            {
+                centroid += worldGrid.GetTileCenter(t);
+            }
+            centroid /= province.tiles.Count;
+
+            HashSet<int> provinceTiles = new HashSet<int>(province.tiles);
+
+            // Compute scores
+            var tileDataList = new List<TileScoreData>();
+            float minRes = float.MaxValue, maxRes = float.MinValue;
+            float minCentroidDist = float.MaxValue, maxCentroidDist = float.MinValue;
+            float minPop = float.MaxValue, maxPop = float.MinValue;
+
+            foreach (int t in candidateTiles)
+            {
+                float res = tileScores[t];
+                if (res < minRes) minRes = res;
+                if (res > maxRes) maxRes = res;
+
+                float dist = (worldGrid.GetTileCenter(t) - centroid).magnitude;
+                if (dist < minCentroidDist) minCentroidDist = dist;
+                if (dist > maxCentroidDist) maxCentroidDist = dist;
+
+                float pop = FactionPlacementUtility.EvaluatePopulationRetention(t, provinceTiles);
+                if (pop < minPop) minPop = pop;
+                if (pop > maxPop) maxPop = pop;
+
+                tileDataList.Add(new TileScoreData { Tile = t, ResScore = res, CentroidDist = dist, PopRetention = pop });
+            }
+
+            // Calculate final score: 20% centrality, 40% resources, 40% population retention
+            var sortedCandidates = tileDataList.Select(data =>
+            {
+                float normRes = (maxRes > minRes) ? (data.ResScore - minRes) / (maxRes - minRes) : 1.0f;
+                float normCentroidDist = (maxCentroidDist > minCentroidDist) ? (data.CentroidDist - minCentroidDist) / (maxCentroidDist - minCentroidDist) : 0.0f;
+                float centrality = 1.0f - normCentroidDist;
+                float normPop = (maxPop > minPop) ? (data.PopRetention - minPop) / (maxPop - minPop) : 1.0f;
+
+                float finalScore = 0.4f * normRes + 0.2f * centrality + 0.4f * normPop;
+                return new { Tile = data.Tile, FinalScore = finalScore };
+            })
+            .OrderByDescending(x => x.FinalScore)
+            .Select(x => x.Tile)
+            .ToList();
+
+            foreach (var tile in sortedCandidates)
             {
                 bool tooCloseToRival = false;
                 foreach (var otherBase in allPlacedBases)
@@ -546,7 +601,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 if (!tooCloseToRival) return tile;
             }
 
-            foreach (var tile in candidateTiles)
+            foreach (var tile in sortedCandidates)
             {
                 bool tooCloseToRival = false;
                 foreach (var otherBase in allPlacedBases)
@@ -562,7 +617,15 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 if (!tooCloseToRival) return tile;
             }
 
-            return candidateTiles[0];
+            return sortedCandidates[0];
+        }
+
+        private struct TileScoreData
+        {
+            public int Tile;
+            public float ResScore;
+            public float CentroidDist;
+            public float PopRetention;
         }
 
         private static bool IsProvinceAdjacentToAny(GeographicProvince p, List<GeographicProvince> existing, SynapseRegionManager manager, WorldGrid worldGrid)
@@ -716,13 +779,18 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         }
     }
 
+    // Tracing-only patches. They change no behaviour and exist purely to show when world
+    // generation reaches these steps, so they stay silent outside dev mode: dumping a full
+    // StackTrace on every world generation is expensive, and the resulting "at ..." frames
+    // are indistinguishable from a real exception when reading Player.log.
     [HarmonyPatch(typeof(WorldGenerator), "GenerateWorld")]
     public static class Patch_WorldGenerator_GenerateWorld
     {
         [HarmonyPrefix]
         public static void Prefix()
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenerator.GenerateWorld PREFIX is executing!");
+            if (!Prefs.DevMode) return;
+            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenerator.GenerateWorld prefix reached.");
         }
     }
 
@@ -732,7 +800,38 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPrefix]
         public static void Prefix()
         {
-            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh PREFIX is executing!\n" + new System.Diagnostics.StackTrace().ToString());
+            if (!Prefs.DevMode) return;
+            Log.Message("[RimSynapse-RegionsAndTerritories] WorldGenStep_Factions.GenerateFresh prefix reached.\n"
+                + new System.Diagnostics.StackTrace());
+        }
+    }
+
+    [HarmonyPatch(typeof(WorldObjectsHolder), "Add")]
+    public static class Patch_WorldObjectsHolder_Add
+    {
+        [HarmonyPostfix]
+        public static void Postfix(WorldObject o)
+        {
+            if (o is Settlement || o.GetType().Name == "WorldSettlementFC")
+            {
+                if (o.Faction != null)
+                {
+                    World world = Find.World;
+                    if (world != null)
+                    {
+                        var regionManager = world.GetComponent<SynapseRegionManager>();
+                        if (regionManager != null)
+                        {
+                            // Only set if not already set (to preserve initial generation indices)
+                            if (regionManager.GetSettlementPlacementOrder(o.Tile) == -1)
+                            {
+                                int nextOrder = regionManager.GetNextPlacementOrderForFaction(o.Faction);
+                                regionManager.SetSettlementPlacementOrder(o.Tile, nextOrder);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

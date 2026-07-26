@@ -29,6 +29,8 @@ namespace RimSynapse.RegionsAndTerritories
             var regionManager = Find.World.GetComponent<SynapseRegionManager>();
             if (regionManager == null) return;
 
+            regionManager.RecalculateProvinceOwners();
+
             foreach (var province in regionManager.Provinces)
             {
                 if (province.tiles.Count == 0) continue;
@@ -84,11 +86,11 @@ namespace RimSynapse.RegionsAndTerritories
 
                     if (factions.Count == 1)
                     {
-                        ownerString = "Domain of: " + factions[0].Name;
+                        ownerString = "Domain of: " + TextureUtility.GetFactionDisplayName(factions[0]);
                     }
                     else if (factions.Count > 1)
                     {
-                        ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + f.Name));
+                        ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + TextureUtility.GetFactionDisplayName(f)));
                     }
                 }
 
@@ -106,6 +108,24 @@ namespace RimSynapse.RegionsAndTerritories
                 );
 
                 regions.Add(region);
+            }
+        }
+
+        public override void MapModeOnGUI()
+        {
+            base.MapModeOnGUI();
+            if (Find.World != null)
+            {
+                int mouseTile = GenWorld.MouseTile();
+                if (mouseTile >= 0)
+                {
+                    var regionManager = Find.World.GetComponent<SynapseRegionManager>();
+                    var province = regionManager?.GetProvinceForTile(mouseTile);
+                    if (province != null)
+                    {
+                        UI.RegionalPieChartWindow.DrawHoverWindow(province, Event.current.mousePosition);
+                    }
+                }
             }
         }
 
@@ -130,23 +150,9 @@ namespace RimSynapse.RegionsAndTerritories
                 province.InitializeProvinceEconomics();
             }
 
-            string ownerString = "Unaffiliated Wilderness";
-            if (province.owningFactionIds.Any())
-            {
-                var factions = province.owningFactionIds
-                    .Select(id => Find.FactionManager.AllFactions.FirstOrDefault(f => f.GetUniqueLoadID() == id))
-                    .Where(f => f != null)
-                    .ToList();
+            var data = province.ownershipData ?? RegionalOwnershipUtility.CalculateOwnership(province);
 
-                if (factions.Count == 1)
-                {
-                    ownerString = "Domain of: " + factions[0].Name;
-                }
-                else if (factions.Count > 1)
-                {
-                    ownerString = "Contested Domain of:\n" + string.Join("\n", factions.Select(f => "- " + f.Name));
-                }
-            }
+            string ownerString = RegionalDomainUtility.GetStatusDescription(data);
 
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             sb.AppendLine($"Region: {province.name}");
@@ -154,6 +160,24 @@ namespace RimSynapse.RegionsAndTerritories
             sb.AppendLine($"Biome: {province.primaryBiome?.LabelCap ?? "Unknown"}");
             sb.AppendLine($"Status: {ownerString}");
             sb.AppendLine($"Tiles: {province.tiles.Count}");
+            
+            if (data != null && data.factionScores.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("--- Regional Influence Breakdown ---");
+                foreach (var fs in data.factionScores)
+                {
+                    if (fs.TotalScore <= 0.001f) continue;
+                    string fname = fs.faction != null ? TextureUtility.GetFactionDisplayName(fs.faction) : "Unknown";
+                    sb.AppendLine($"- {fname}: {fs.TotalScore:P0}");
+                    sb.AppendLine($"  (Settlements: {fs.settlementScore:P0}, Borders: {fs.perimeterCoverageScore + fs.externalPerimeterScore:P0}, Outposts: {fs.outpostCoverageScore + fs.mostOutpostsScore:P0}, Ideology: {fs.demographicScore:P0})");
+                }
+                if (data.unclaimedScore > 0.01f)
+                {
+                    sb.AppendLine($"- Unclaimed: {data.unclaimedScore:P0}");
+                }
+            }
+
             sb.AppendLine();
             sb.AppendLine("--- Regional Economics ---");
             sb.AppendLine($"Population: {province.currentPopulation}");

@@ -12,6 +12,38 @@ namespace RimSynapse.RegionsAndTerritories
     {
         private List<GeographicProvince> provinces = new List<GeographicProvince>();
         private int[] tileToProvinceId;
+        private Dictionary<int, int> settlementPlacementOrder = new Dictionary<int, int>();
+
+        public int GetSettlementPlacementOrder(int tileId)
+        {
+            if (settlementPlacementOrder != null && settlementPlacementOrder.TryGetValue(tileId, out int order))
+            {
+                return order;
+            }
+            return -1;
+        }
+
+        public void SetSettlementPlacementOrder(int tileId, int order)
+        {
+            if (settlementPlacementOrder == null)
+            {
+                settlementPlacementOrder = new Dictionary<int, int>();
+            }
+            settlementPlacementOrder[tileId] = order;
+        }
+
+        public int GetNextPlacementOrderForFaction(Faction faction)
+        {
+            int count = 0;
+            foreach (var obj in Find.WorldObjects.AllWorldObjects)
+            {
+                if ((obj is Settlement || obj.GetType().Name == "WorldSettlementFC") && obj.Faction == faction)
+                {
+                    count++;
+                }
+            }
+            return count + 1;
+        }
 
         public List<GeographicProvince> Provinces
         {
@@ -68,6 +100,12 @@ namespace RimSynapse.RegionsAndTerritories
             if (provinces == null)
             {
                 provinces = new List<GeographicProvince>();
+            }
+
+            Scribe_Collections.Look(ref settlementPlacementOrder, "settlementPlacementOrder", LookMode.Value, LookMode.Value);
+            if (settlementPlacementOrder == null)
+            {
+                settlementPlacementOrder = new Dictionary<int, int>();
             }
 
             List<int> tempList = null;
@@ -300,7 +338,9 @@ namespace RimSynapse.RegionsAndTerritories
                 bool hasFeatures = ChunkHasNaturalFeatures(landPocket);
                 int maxAllowed = hasFeatures ? maxWithFeatures : maxNoFeatures;
 
-                if (landPocket.Count <= maxAllowed)
+                int usableCount = landPocket.Count(t => IsTileUsable(t));
+
+                if (usableCount <= maxAllowed)
                 {
                     GeographicProvince domain = new GeographicProvince(provinceIdCounter);
                     domain.tiles = landPocket.ToList();
@@ -662,7 +702,7 @@ namespace RimSynapse.RegionsAndTerritories
         private List<List<int>> SplitChunkByVoronoi(List<int> chunk)
         {
             HashSet<int> chunkSet = new HashSet<int>(chunk);
-            int size = chunk.Count;
+            int size = chunk.Count(t => IsTileUsable(t));
 
             float targetSize = (FactionPlacementSettings.minRegionSize + FactionPlacementSettings.maxRegionSize) / 2f;
             int k = Mathf.CeilToInt((float)size / targetSize);
@@ -892,7 +932,7 @@ namespace RimSynapse.RegionsAndTerritories
                         {
                             if (provinceMap.TryGetValue(kvp.Key, out var neighborProv))
                             {
-                                if (neighborProv.tiles.Count + p.tiles.Count <= FactionPlacementSettings.maxRegionSize + 50)
+                                if (neighborProv.tiles.Count(t => IsTileUsable(t)) + p.tiles.Count(t => IsTileUsable(t)) <= FactionPlacementSettings.maxRegionSize + 50)
                                 {
                                     bestNeighbor = neighborProv;
                                     break;
@@ -1150,31 +1190,57 @@ namespace RimSynapse.RegionsAndTerritories
 
         public void RecalculateProvinceOwners()
         {
-            if (Find.WorldObjects == null) return;
+            if (Find.WorldObjects == null || provinces == null) return;
 
             foreach (var province in provinces)
             {
                 province.owningFactionIds.Clear();
-            }
+                province.ownershipData = RegionalOwnershipUtility.CalculateOwnership(province);
 
-            var settlements = Find.WorldObjects.Settlements;
-            if (settlements == null) return;
-
-            foreach (var s in settlements)
-            {
-                if (s.Faction != null)
+                if (province.ownershipData != null && province.ownershipData.factionScores != null)
                 {
-                    GeographicProvince province = GetProvinceForTile(s.Tile);
-                    if (province != null)
+                    foreach (var fs in province.ownershipData.factionScores)
                     {
-                        string fid = s.Faction.GetUniqueLoadID();
-                        if (!province.owningFactionIds.Contains(fid))
+                        if (fs.faction != null && fs.TotalScore > 0.05f)
                         {
-                            province.owningFactionIds.Add(fid);
+                            string fid = fs.faction.GetUniqueLoadID();
+                            if (!province.owningFactionIds.Contains(fid))
+                            {
+                                province.owningFactionIds.Add(fid);
+                            }
                         }
                     }
                 }
             }
+        }
+
+        public bool AreProvincesAdjacent(GeographicProvince a, GeographicProvince b)
+        {
+            if (a == null || b == null) return false;
+            if (a.id == b.id) return true;
+
+            // Check if any tile in 'a' shares a neighbor with any tile in 'b'
+            foreach (int tileA in a.tiles)
+            {
+                foreach (int tileB in b.tiles)
+                {
+                    if (Find.WorldGrid.IsNeighbor(tileA, tileB))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public static bool IsTileUsable(int tileId)
+        {
+            if (Find.WorldGrid == null) return false;
+            Tile tileData = Find.WorldGrid[tileId];
+            if (tileData == null) return false;
+            if (tileData.WaterCovered || tileData.hilliness == Hilliness.Impassable) return false;
+            if (tileData.PrimaryBiome != null && (tileData.PrimaryBiome.impassable || tileData.PrimaryBiome.defName == "SeaIce")) return false;
+            return true;
         }
     }
 }

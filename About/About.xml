@@ -4,7 +4,7 @@
     <author>RimSynapse Team</author>
     <packageId>RimSynapse.RegionsAndTerritories</packageId>
     <url>https://github.com/RimSynapse/Regions-and-Territories</url>
-    <modVersion>0.5.0</modVersion>
+    <modVersion>0.5.2</modVersion>
     <supportedVersions>
         <li>1.5</li>
         <li>1.6</li>
@@ -19,12 +19,18 @@
     </modDependencies>
     <loadAfter>
         <li>NozoMe.MapModeFramework</li>
+        <li>Matathias.Empire</li>
+        <li>OskarPotocki.VanillaFactionsExpanded.Core</li>
+        <li>vanillaexpanded.outposts</li>
         <li>Ludeon.RimWorld.Royalty</li>
         <li>Ludeon.RimWorld.Ideology</li>
         <li>Ludeon.RimWorld.Biotech</li>
         <li>Ludeon.RimWorld.Anomaly</li>
     </loadAfter>
     <description>
+Discord Community: https://discord.gg/eVBebZ2N9s
+Version: v0.5.2 (Target: RimWorld 1.6)
+
 RimSynapse - Regions and Territories
 Official Wiki and Documentation: https://github.com/RimSynapse/Regions-and-Territories/wiki
 
