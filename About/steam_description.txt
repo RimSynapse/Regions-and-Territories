@@ -2,6 +2,7 @@
 [b]Version:[/b] v0.5.2 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Regions and Territories[/h1]
+[b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
 [b]Overhauls the world map generation with dynamic geographic province generation, world map overlays, and territory borders.[/b]
 
 Regions and Territories divides the globe into dynamic geographic provinces with defined borders, population densities, custom road linkages, and procedurally placed ruins.
