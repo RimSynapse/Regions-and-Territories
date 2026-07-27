@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
@@ -32,6 +31,25 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             }
             
             return -1;
+        }
+
+        /// <summary>
+        /// The faction a foreign mod's holding belongs to, or null. Empire runs the player's
+        /// colonies under a faction of its own, so falling back to <c>Faction.OfPlayer</c> at the
+        /// call site is a fallback rather than the answer — asking the object first is what keeps
+        /// the supply model measuring the territory that actually launched the operation.
+        /// </summary>
+        private static Faction GetFactionSafe(object obj)
+        {
+            if (obj == null) return null;
+
+            var prop = obj.GetType().GetProperty("Faction", BindingFlags.Public | BindingFlags.Instance);
+            if (prop != null && prop.GetValue(obj) is Faction fromProperty) return fromProperty;
+
+            var field = obj.GetType().GetField("Faction", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field != null && field.GetValue(obj) is Faction fromField) return fromField;
+
+            return null;
         }
 
         private static string GetDefNameSafe(object obj)
@@ -179,22 +197,23 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 int sourceTileId = GetTileSafe(sourceSettlement);
                 if (sourceTileId == -1) return true;
 
-                if (Find.World == null) return true;
-                var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                if (regionManager == null) return true;
+                // 0.7 Epic 5 children 1 and 2. This block used to carry the adjacency rule inline:
+                // target province must be the source province or one of its neighbours, full stop.
+                // It now asks the shared supply model, which names no mod and can therefore govern
+                // any other mod's military action the same way.
+                //
+                // The change is a relaxation. An adjacent target costs 1 in the supply model and is
+                // always inside the ceiling whoever holds the ground, so every operation that was
+                // legal before is still legal; what is new is the deep strike along a corridor of
+                // provinces the faction actually holds. It also means the militaryGovernance setting
+                // finally controls something — the old check consulted no switch at all.
+                Faction launching = GetFactionSafe(sourceSettlement) ?? Faction.OfPlayer;
 
-                int sourceProvinceId = regionManager.GetProvinceId(sourceTileId);
-                int targetProvinceId = regionManager.GetProvinceId(targetTileId);
-
-                if (sourceProvinceId != -1 && targetProvinceId != -1 && sourceProvinceId != targetProvinceId)
+                string reason;
+                if (!MilitaryReachUtility.CanReach(sourceTileId, targetTileId, launching, out reason))
                 {
-                    var sourceProvince = regionManager.Provinces.FirstOrDefault(p => p.id == sourceProvinceId);
-                    var targetProvince = regionManager.Provinces.FirstOrDefault(p => p.id == targetProvinceId);
-                    if (sourceProvince != null && targetProvince != null && !regionManager.AreProvincesAdjacent(sourceProvince, targetProvince))
-                    {
-                        Messages.Message("Cannot launch military operation: Target region is too far. Your military actions must expand sequentially through adjacent regions.", MessageTypeDefOf.RejectInput);
-                        return false; // Cancel SendMilitary execution
-                    }
+                    Messages.Message(reason, MessageTypeDefOf.RejectInput);
+                    return false; // Cancel SendMilitary execution
                 }
             }
             catch (Exception ex)
