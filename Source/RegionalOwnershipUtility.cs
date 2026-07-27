@@ -43,8 +43,9 @@ namespace RimSynapse.RegionsAndTerritories
             var allFactions = Find.FactionManager.AllFactionsListForReading;
             var regionObjects = Find.WorldObjects.AllWorldObjects.Where(obj => province.tiles.Contains(obj.Tile)).ToList();
 
-            var settlements = regionObjects.Where(obj => obj is Settlement || obj.GetType().Name.Contains("WorldSettlementFC")).ToList();
-            var outposts = regionObjects.Where(obj => PopulationDensityUtility.IsVoeOutpost(obj) || obj.GetType().Name.Contains("Outpost") || obj.def.defName.Contains("Outpost")).ToList();
+            // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
+            var settlements = regionObjects.Where(Integration.WorldObjectClassifier.IsSettlement).ToList();
+            var outposts = regionObjects.Where(Integration.WorldObjectClassifier.IsOutpost).ToList();
 
             HashSet<Faction> candidateFactions = GetCandidateFactions(settlements, outposts, allFactions);
             if (candidateFactions.Count == 0)

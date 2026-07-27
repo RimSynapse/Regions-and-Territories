@@ -127,13 +127,23 @@ namespace RimSynapse.RegionsAndTerritories
                 foreach (var obj in allWorldObjects)
                 {
                     if (obj == null) continue;
-                    if (IsVoeOutpost(obj))
+
+                    // Vanilla settlements were already counted above.
+                    if (obj is Settlement) continue;
+
+                    // 0.7: any inhabited world object from any mod is a population source, not just
+                    // VOE outposts. The classifier decides; the adapter supplies the head count.
+                    if (!Integration.WorldObjectClassifier.HasPopulation(obj)) continue;
+
+                    int pop = Integration.WorldObjectClassifier.GetPopulation(obj);
+                    if (pop <= 0 && IsVoeOutpost(obj))
                     {
-                        int pop = GetVoeOutpostPopulation(obj);
-                        if (pop > 0)
-                        {
-                            popSources.Add(new PopSource { tileId = obj.Tile, population = pop });
-                        }
+                        pop = GetVoeOutpostPopulation(obj);
+                    }
+
+                    if (pop > 0)
+                    {
+                        popSources.Add(new PopSource { tileId = obj.Tile, population = pop });
                     }
                 }
             }

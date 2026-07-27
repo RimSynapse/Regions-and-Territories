@@ -39,8 +39,10 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             }
 
             // 2. Sequential Expansion constraint: must be adjacent to existing territory if we have one
+            // 0.7: "is this a holding the player controls?" is answered by the classifier, which
+            // covers empire-style mods that run player colonies under their own world-object type.
             var playerBases = Find.WorldObjects.AllWorldObjects
-                .Where(obj => obj.Faction != null && (obj.Faction.IsPlayer || obj.GetType().Name == "WorldSettlementFC"))
+                .Where(Integration.WorldObjectClassifier.IsPlayerHolding)
                 .ToList();
 
             if (playerBases.Any())

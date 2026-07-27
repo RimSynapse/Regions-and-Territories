@@ -24,6 +24,10 @@ namespace RimSynapse.RegionsAndTerritories
                 Log.Message($"[RimSynapse-RegionsAndTerritories] Successfully patched method: {m.DeclaringType.FullName}.{m.Name}");
             }
 
+            // 0.7: build the mod-agnostic world-object adapter set before any integration patching,
+            // so the patches below can classify through the registry instead of naming mod types.
+            Integration.WorldObjectAdapterRegistry.Initialize();
+
             TryRegisterPopulationDelegate();
             TryPatchEmpires(harmony);
             TryPatchVOE(harmony);

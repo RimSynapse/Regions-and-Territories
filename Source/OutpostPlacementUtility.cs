@@ -21,12 +21,13 @@ namespace RimSynapse.RegionsAndTerritories
             WorldGrid grid = Find.WorldGrid;
             var allObjects = Find.WorldObjects.AllWorldObjects;
 
+            // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
             var settlements = allObjects
-                .Where(o => o is Settlement || o.GetType().Name.Contains("WorldSettlementFC"))
+                .Where(Integration.WorldObjectClassifier.IsSettlement)
                 .ToList();
 
             var allOutposts = allObjects
-                .Where(o => PopulationDensityUtility.IsVoeOutpost(o) || o.GetType().Name.Contains("Outpost") || o.def.defName.Contains("Outpost"))
+                .Where(Integration.WorldObjectClassifier.IsOutpost)
                 .ToList();
 
             // 1. Buffer Check: At least 1 tile between outposts and settlements (Distance >= 2)

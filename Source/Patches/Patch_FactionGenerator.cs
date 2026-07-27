@@ -812,7 +812,8 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPostfix]
         public static void Postfix(WorldObject o)
         {
-            if (o is Settlement || o.GetType().Name == "WorldSettlementFC")
+            // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
+            if (Integration.WorldObjectClassifier.IsSettlement(o))
             {
                 if (o.Faction != null)
                 {
