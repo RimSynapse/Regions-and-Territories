@@ -34,7 +34,14 @@ Version: v0.6.1 (Target: RimWorld 1.6)
 RimSynapse - Regions and Territories
 Official Wiki and Documentation: https://github.com/RimSynapse/Regions-and-Territories/wiki
 
-Handles mapping dynamics, including dynamic geographic province generation, world map overlays, regional faction territory control, population density mapping, road generation, and ruins placement. 
+Handles mapping dynamics, including dynamic geographic province generation, world map overlays, regional faction territory control, population density mapping, road generation, and ruins placement.
+
+*** REQUIRES A NEW COLONY - NOT SAVE-GAME COMPATIBLE ***
+Install this before you generate a world, not partway through a playthrough.
+
+Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. Added to a world that already exists, the provinces get drawn around settlements that were never placed by any of those rules - so territory ownership, occupancy, and border logic all report results that look broken, because the world they are describing never followed the rules they assume.
+
+Removing it from an in-progress save will log errors about missing province data the next time that save is loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
 Requires: Map Mode Framework
 

@@ -5,6 +5,15 @@
 [b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
 [b]Overhauls the world map generation with dynamic geographic province generation, world map overlays, and territory borders.[/b]
 
+---
+
+[h2]⚠ Requires a New Colony - Not Save-Game Compatible[/h2]
+[b]Install this before you generate a world, not partway through a playthrough.[/b]
+
+Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. Add it to a world that already exists and the provinces get drawn around settlements that were never placed by any of those rules - so territory ownership, occupancy, and border logic all report results that look broken, because the world they are describing never followed the rules they assume.
+
+Removing it from an in-progress save will log errors about missing province data when that save is next loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
+
 Regions and Territories divides the globe into dynamic geographic provinces with defined borders, population densities, custom road linkages, and procedurally placed ruins.
 
 ---
@@ -66,6 +75,7 @@ These ship when they are ready - no dates.
 [*] [b]Anomaly DLC:[/b] Compatible
 [*] [b]Odyssey DLC:[/b] Fully Compatible and Optimized. Space factions are generated on the Orbit layer naturally, and terrestrial factions generate on the Surface layer.
 [*] [b]Map Mode Framework:[/b] Required for the map mode overlays.
+[*] [b]Existing saves:[/b] Not supported - a new colony is required. See the notice at the top of this page.
 [/list]
 
 ---
