@@ -1,6 +1,6 @@
 # Behaviour tests
 
-375 assertions that run without RimWorld, Unity, Harmony, or a game install.
+430 assertions that run without RimWorld, Unity, Harmony, or a game install.
 
 ```
 sudo apt-get install -y mono-mcs mono-runtime   # once, on WSL or Linux
@@ -12,7 +12,8 @@ Exit code is zero only if every suite builds and every assertion holds.
 ## Why this can exist at all
 
 The 0.7 rules layers are deliberately dependency-free. `Source/Integration/`, `Source/Placement/`,
-`Source/Sizing/`, `Source/Economy/` and `Source/Military/` contain no `Find`, no Harmony attributes, no Unity types and
+`Source/Sizing/`, `Source/Economy/`, `Source/Military/` and `Source/Standing/` contain no `Find`, no
+Harmony attributes, no Unity types and
 no `TechLevel`; they receive world state as plain numbers or `Func` delegates, and exactly one
 façade file per subsystem touches the game. That separation is the reason the rules can be compiled
 against the hand-written doubles in `RimWorldStubs.cs` and executed anywhere. It is also the
@@ -29,11 +30,12 @@ rather than hunt constants through patch files.
 | `EconomyTests` | resource pools, depletion, renewal, scanning, and the production factors |
 | `TaxationTests` | how much of a levy reaches the capital, and why growing a city is not a trap |
 | `MilitaryTests` | how far a faction can project force, and what holding the ground in between buys |
+| `StandingTests` | the per-faction summary R&T publishes for other mods, and how strong it makes a faction look |
 | `ScalingTests` | the derived security rule and the Empire resource-name table |
 
 The type-check at the end of the run is not a behaviour test. It compiles the impure files —
 `WorldObjectPlacementUtility`, `SettlementSizeUtility`, `ProductionScalingUtility`, `TaxationUtility`,
-`MilitaryReachUtility`, `ProvinceAdjacency`, the Empire patch
+`MilitaryReachUtility`, `ProvinceAdjacency`, `FactionStandingUtility`, the Empire patch
 — against stub signatures written from the real ones. It cannot tell you a patch is correct. It can
 tell you a patch calls a method that no longer exists, which is otherwise invisible until RimWorld
 loads the assembly and Harmony throws.

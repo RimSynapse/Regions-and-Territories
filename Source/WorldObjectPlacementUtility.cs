@@ -92,8 +92,13 @@ namespace RimSynapse.RegionsAndTerritories
         /// Every faction the player is actually running. Normally just <c>Faction.OfPlayer</c>, but
         /// empire-style mods give the player's holdings a faction of their own, and Epic 1's
         /// classifier is what recognises them without naming the mod.
+        ///
+        /// <para>Public because <see cref="FactionStandingUtility"/> has to answer the same question
+        /// before it can summarise the player, and the two must agree: a placement rule that treats
+        /// the player's empire as the player, next to a published summary that does not, is a
+        /// contradiction another mod would eventually build on.</para>
         /// </summary>
-        private static HashSet<Faction> CollectPlayerControlledFactions()
+        public static HashSet<Faction> CollectPlayerControlledFactions()
         {
             var factions = new HashSet<Faction>();
 

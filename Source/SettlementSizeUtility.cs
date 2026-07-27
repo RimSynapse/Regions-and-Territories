@@ -43,8 +43,12 @@ namespace RimSynapse.RegionsAndTerritories
         /// <summary>
         /// Population from the owning mod if it exposes one, falling back to R&amp;T's own estimate
         /// for plain settlements. A mod that tracks its colonies' headcount knows better than we do.
+        ///
+        /// <para>Public because Epic 6's summary needs the same number for the same holding, and a
+        /// second implementation of "how many people live here" is exactly the kind of near-duplicate
+        /// that drifts apart over two releases and then has to be reconciled by whoever notices.</para>
         /// </summary>
-        private static int PopulationOf(WorldObject obj, WorldObjectKind kind)
+        public static int PopulationOf(WorldObject obj, WorldObjectKind kind)
         {
             int population;
             if (WorldObjectAdapterRegistry.TryGetPopulation(obj, out population) && population > 0)
