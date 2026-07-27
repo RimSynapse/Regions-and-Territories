@@ -80,40 +80,18 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 string defName = GetDefNameSafe(def);
                 if (string.IsNullOrEmpty(defName)) return __result;
 
-                if (Find.World == null) return __result;
-                var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                if (regionManager == null) return __result;
+                // 0.7: the abundance switch that used to live here has moved into
+                // ProductionScalingUtility, which is where VOE and anything else the registry learns
+                // about ask the same question. This postfix no longer knows what a province is.
+                //
+                // The whole model — abundance, labour, security, locality, settlement tier — is
+                // applied here, at the base, so the clamp in ProductionEvaluator.Compose bounds one
+                // product rather than two halves that can multiply past it. CalculateProductionMult
+                // steps aside for exactly the resources this handles; see the note there.
+                Economy.ResourceKind kind;
+                if (!ProductionScalingUtility.TryResolveResourceKind(defName, out kind)) return __result;
 
-                var province = regionManager.GetProvinceForTile(tileId);
-                if (province == null) return __result;
-
-                // Apply dynamic scaling to base production based on the Geographic Province's actual resources
-                float modifier = 1.0f;
-                switch (defName)
-                {
-                    case "RTD_Food":
-                    case "RTD_Animals":
-                        modifier = GetResourceScale(province.rawNutrition, 1000f);
-                        break;
-                    case "RTD_Logging":
-                        modifier = GetResourceScale(province.biomass, 500f);
-                        break;
-                    case "RTD_Mining":
-                        modifier = GetResourceScale(province.minerals, 500f);
-                        break;
-                    case "RTD_Apparel":
-                        modifier = GetResourceScale(province.textiles, 100f);
-                        break;
-                    case "RTD_Weapons":
-                        modifier = GetResourceScale(province.preIndustrialGoods, 100f);
-                        break;
-                    case "RTD_Medicine":
-                        modifier = GetResourceScale(province.industrialGoods, 100f);
-                        break;
-                    case "RTD_Research":
-                        modifier = GetResourceScale(province.spacerGoods, 100f);
-                        break;
-                }
+                float modifier = ProductionScalingUtility.FactorFor(tileId, kind, GetPlayerFaction());
 
                 return __result * modifier;
             }
@@ -138,6 +116,22 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 int tileId = GetTileSafe(settlement);
                 if (tileId == -1) return __result;
 
+                // 0.7: labour is part of the composed model now, and the model is applied at the
+                // base. Applying a population curve here as well would count the same people twice,
+                // so for any resource CalculateProductionBase handled, this stands down.
+                //
+                // It does not stand down for the rest. A resource R&T has no pool for still gets the
+                // 0.6 population curve exactly as before — dropping it would quietly cut production
+                // on every resource the table does not name, which is the opposite of what a
+                // mod-agnostic layer is for.
+                var defField = __instance.GetType().GetField("def", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+                object def = defField != null ? defField.GetValue(__instance) : null;
+                Economy.ResourceKind handled;
+                if (def != null && ProductionScalingUtility.TryResolveResourceKind(GetDefNameSafe(def), out handled))
+                {
+                    return __result;
+                }
+
                 if (Find.World == null) return __result;
                 var regionManager = Find.World.GetComponent<SynapseRegionManager>();
                 if (regionManager == null) return __result;
@@ -145,11 +139,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 var province = regionManager.GetProvinceForTile(tileId);
                 if (province == null) return __result;
 
-                // Population density scales the production multiplier (higher population = higher trade efficiency!)
-                // Baseline: 0 population gives 0.8x, 2000+ population gives up to 1.5x
-                float popDensity = province.currentPopulation;
-                float popMult = 0.8f + (popDensity / 2000f);
-                if (popMult > 1.5f) popMult = 1.5f;
+                float popMult = Economy.ProductionEvaluator.LabourFactor(province.currentPopulation);
 
                 return __result * popMult;
             }
@@ -214,14 +204,10 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             return true;
         }
 
-        private static float GetResourceScale(float value, float baseline)
-        {
-            if (value <= 0f) return 0.2f;
-            float scale = value / baseline;
-            if (scale < 0.2f) return 0.2f;
-            if (scale > 2.0f) return 2.0f;
-            return scale;
-        }
+        // GetResourceScale lived here until 0.7. It is now
+        // Economy.ProductionEvaluator.AbundanceFactor, with its constants in
+        // Economy.ProductionRules, unchanged to the digit and covered by tests. Leaving a second
+        // copy behind is how two mods' economies drift apart without anyone noticing.
 
         private static T GetFieldValue<T>(object obj, string name, T defaultValue = default)
         {
