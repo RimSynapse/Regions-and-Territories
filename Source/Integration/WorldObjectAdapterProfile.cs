@@ -66,7 +66,15 @@ namespace RimSynapse.RegionsAndTerritories.Integration
         /// <summary>Candidate member names holding the mod's maximum upgrade level.</summary>
         public string[] maxLevelMembers = new string[0];
 
-        /// <summary>Fallback when the mod exposes no max-level member. 0 means "unknown".</summary>
+        /// <summary>
+        /// Fallback when the mod exposes no max-level member. 0 means "unknown".
+        ///
+        /// A level with no maximum is a numerator with no denominator, so
+        /// <c>SettlementSizeEvaluator.FromLevel</c> ignores it and the holding is tiered on headcount
+        /// alone. That is deliberate: guessing a maximum would invent a progression the mod does not
+        /// have. Profiles that leave this at 0 are declaring "we can read a level but not judge it" —
+        /// filling it in is the fix, and it needs the mod loaded to do honestly.
+        /// </summary>
         public int assumedMaxLevel;
 
         /// <summary>
