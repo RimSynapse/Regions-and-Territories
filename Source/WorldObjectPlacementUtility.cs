@@ -63,7 +63,8 @@ namespace RimSynapse.RegionsAndTerritories
                 ProvinceIdAt = tile => regionManager != null ? regionManager.GetProvinceId(tile) : -1,
                 ControlOf = (provinceId, faction) => ControlOf(regionManager, provinceId, faction as Faction),
                 HeldBorderTiles = faction => HeldBorderTiles(regionManager, faction as Faction),
-                ProvincesAdjacent = (a, b) => ProvincesAdjacent(regionManager, a, b)
+                HeldProvinceIds = faction => HeldProvinceIds(regionManager, faction as Faction),
+                ProvincesAdjacent = (a, b) => ProvinceAdjacency.AreAdjacent(regionManager, a, b)
             };
 
             return world;
@@ -147,16 +148,25 @@ namespace RimSynapse.RegionsAndTerritories
             return tiles;
         }
 
-        private static bool ProvincesAdjacent(SynapseRegionManager regionManager, int a, int b)
+        /// <summary>
+        /// Every province the faction holds or co-holds, which is what the expansion rule measures
+        /// outward from. The same walk <see cref="HeldBorderTiles"/> already does, asking the same
+        /// question of the same method, so the two can never disagree about where the border is.
+        /// </summary>
+        private static IEnumerable<int> HeldProvinceIds(SynapseRegionManager regionManager, Faction faction)
         {
-            if (regionManager == null || a < 0 || b < 0) return false;
-            if (a == b) return true;
+            var ids = new List<int>();
+            if (regionManager == null || faction == null) return ids;
 
-            GeographicProvince pa = regionManager.GetProvince(a);
-            GeographicProvince pb = regionManager.GetProvince(b);
-            if (pa == null || pb == null) return false;
+            foreach (GeographicProvince province in regionManager.Provinces)
+            {
+                if (province == null) continue;
+                if (!RegionalOwnershipUtility.HoldsTerritory(province, faction)) continue;
 
-            return regionManager.AreProvincesAdjacent(pa, pb);
+                ids.Add(province.id);
+            }
+
+            return ids;
         }
     }
 }

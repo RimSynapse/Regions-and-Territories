@@ -144,6 +144,19 @@ namespace RimSynapse.RegionsAndTerritories.Placement
         /// Sequential expansion: a faction that already holds ground expands into provinces it
         /// holds or provinces beside them, not across the map. Previously enforced only on the
         /// vanilla settle path; now every permanent holding obeys it.
+        ///
+        /// <para>Epic 5 child 3 asked that new holdings extend territory outward from already-held
+        /// <i>borders</i>. Until now the rule measured outward from <i>holdings</i>, which is a
+        /// narrower thing: a province is held on ownership score or on a worldgen ownership entry,
+        /// neither of which requires a world object of the faction's to be standing in it. A faction
+        /// holding a province it has not yet built in could not expand across that province's
+        /// border, which is the exact move the rule exists to permit.</para>
+        ///
+        /// <para>Reading the held provinces as well is a relaxation everywhere a faction owns
+        /// anything at all. The one case it tightens is a faction with territory and no permanent
+        /// holding anywhere, which used to be exempt from the rule outright; it is now expected to
+        /// build from its own border like everyone else, and it can always build inside its own
+        /// province, so it is never left with nowhere to go.</para>
         /// </summary>
         private static PlacementDecision CheckFoothold(PlacementWorld world, int provinceId, object faction, WorldObjectKind kind)
         {
@@ -153,8 +166,20 @@ namespace RimSynapse.RegionsAndTerritories.Placement
             ProvinceControl here = world.Control(provinceId, faction);
             if (here == ProvinceControl.Held || here == ProvinceControl.Contested) return null;
 
+            bool hasTerritory = false;
+
+            // Held ground first, because it is the cheaper question and the more likely answer for
+            // an established faction: one province lookup per province held, no distance work.
+            foreach (int heldProvince in world.HeldProvincesFor(faction))
+            {
+                if (heldProvince < 0) continue;
+
+                hasTerritory = true;
+                if (heldProvince == provinceId) return null;
+                if (world.AreAdjacent(heldProvince, provinceId)) return null;
+            }
+
             List<PlacementHolding> holdings = world.Holdings;
-            bool hasHoldingSomewhere = false;
 
             if (holdings != null)
             {
@@ -164,7 +189,11 @@ namespace RimSynapse.RegionsAndTerritories.Placement
                     if (h == null || !world.SameClaimant(h.faction, faction)) continue;
                     if (!h.kind.IsPermanentHolding()) continue;
 
-                    hasHoldingSomewhere = true;
+                    // A holding is a foothold whether or not its province scores as held yet — a
+                    // faction that has just planted its first colony has a border before it has an
+                    // ownership score, and refusing to let it expand until the score catches up
+                    // would make the first two turns of a game feel broken.
+                    hasTerritory = true;
 
                     int theirProvince = world.ProvinceAt(h.tile);
                     if (theirProvince < 0) continue;
@@ -173,7 +202,7 @@ namespace RimSynapse.RegionsAndTerritories.Placement
                 }
             }
 
-            if (!hasHoldingSomewhere) return null;
+            if (!hasTerritory) return null;
 
             return PlacementDecision.Refuse(
                 PlacementRejection.NoAdjacentFoothold,

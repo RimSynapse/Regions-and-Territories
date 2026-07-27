@@ -106,6 +106,56 @@ namespace PlacementTests
             held.ControlOf = (p, f) => p == 3 ? ProvinceControl.Held : ProvinceControl.Unclaimed;
             Check("a non-adjacent province you own is still settleable", Allowed(held, 4, Player, WorldObjectKind.Settlement));
 
+            Section("expansion runs outward from held borders, not only from holdings (Epic 5 child 3)");
+            // Three provinces in a row, tiles three wide, nothing built anywhere. The faction is
+            // listed as holding province 2 — which is what a worldgen ownership entry or an
+            // ownership score above the threshold produces without a world object standing in it.
+            var borders = World(
+                Holding(0, WorldObjectKind.Settlement, Player),
+                Holding(2, WorldObjectKind.Settlement, Rival));
+            borders.ProvinceIdAt = t => t < 3 ? 1 : (t < 6 ? 2 : 3);
+            borders.ProvincesAdjacent = (a, b) => Math.Abs(a - b) == 1;
+            borders.HeldProvinceIds = f => Equals(f, Player) ? new[] { 2 } : new int[0];
+            Check("a province beyond the holding but beside held ground is reachable",
+                Allowed(borders, 7, Player, WorldObjectKind.Settlement));
+            Check("a rival standing on the same map gets no benefit from ground it does not hold",
+                Refused(borders, 7, Rival, WorldObjectKind.Settlement, PlacementRejection.NoAdjacentFoothold));
+
+            // Same map, the faction holds nothing: this is the pre-0.7 answer, and it must not move.
+            var unheld = World(Holding(0, WorldObjectKind.Settlement, Player));
+            unheld.ProvinceIdAt = t => t < 3 ? 1 : (t < 6 ? 2 : 3);
+            unheld.ProvincesAdjacent = (a, b) => Math.Abs(a - b) == 1;
+            Check("without held ground the same tile is still refused",
+                Refused(unheld, 7, Player, WorldObjectKind.Settlement, PlacementRejection.NoAdjacentFoothold));
+            Check("and the adjacent province is still allowed",
+                Allowed(unheld, 4, Player, WorldObjectKind.Settlement));
+
+            Section("territory alone is a foothold, and it still has to be adjacent");
+            // A faction with a border and no permanent holding anywhere. It used to be exempt from
+            // the rule outright; it is now expected to build from its own border like everyone else.
+            var territoryOnly = World();
+            territoryOnly.ProvinceIdAt = t => t < 3 ? 1 : (t < 6 ? 2 : 3);
+            territoryOnly.ProvincesAdjacent = (a, b) => Math.Abs(a - b) == 1;
+            territoryOnly.HeldProvinceIds = f => Equals(f, Player) ? new[] { 1 } : new int[0];
+            Check("it may build one province out from its border",
+                Allowed(territoryOnly, 4, Player, WorldObjectKind.Settlement));
+            Check("but not two", Refused(territoryOnly, 7, Player, WorldObjectKind.Settlement, PlacementRejection.NoAdjacentFoothold));
+            Check("and a faction holding nothing anywhere is still exempt",
+                Allowed(territoryOnly, 7, Rival, WorldObjectKind.Settlement));
+            Check("camps are exempt from this too", Allowed(territoryOnly, 7, Player, WorldObjectKind.Camp));
+
+            Section("held ground and holdings answer the same question");
+            // A holding whose province has not yet scored as held is a foothold anyway: a colony
+            // planted this minute has a border before it has an ownership score.
+            var fresh = World(Holding(0, WorldObjectKind.Settlement, Player));
+            fresh.ProvinceIdAt = t => t < 3 ? 1 : (t < 6 ? 2 : 3);
+            fresh.ProvincesAdjacent = (a, b) => Math.Abs(a - b) == 1;
+            fresh.HeldProvinceIds = f => new int[0];
+            Check("a brand-new colony can expand before its ownership score catches up",
+                Allowed(fresh, 4, Player, WorldObjectKind.Settlement));
+            Check("an empire-side colony anchors the player's expansion the same way",
+                Allowed(SharedClaim(), 4, Player, WorldObjectKind.Settlement));
+
             Section("rule precedence");
             var stacked = World(Holding(0, WorldObjectKind.Settlement, Rival));
             stacked.ProvinceIdAt = t => 1;
@@ -141,6 +191,17 @@ namespace PlacementTests
         private static bool IsPlayerSide(object f)
         {
             return Equals(f, Player) || Equals(f, Empire);
+        }
+
+        /// A map whose only holding belongs to the player's empire faction rather than to the
+        /// player directly — the Epic 1 / Epic 2 equivalence, seen from the expansion rule.
+        private static PlacementWorld SharedClaim()
+        {
+            var world = World(Holding(0, WorldObjectKind.Settlement, Empire));
+            world.FactionsMatch = (a, b) => IsPlayerSide(a) && IsPlayerSide(b);
+            world.ProvinceIdAt = t => t < 3 ? 1 : (t < 6 ? 2 : 3);
+            world.ProvincesAdjacent = (a, b) => Math.Abs(a - b) == 1;
+            return world;
         }
 
         private static PlacementHolding Holding(int tile, WorldObjectKind kind, object faction)

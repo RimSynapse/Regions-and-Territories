@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using RimWorld;
-using RimWorld.Planet;
 using RimSynapse.RegionsAndTerritories.Integration;
 using RimSynapse.RegionsAndTerritories.Military;
 using RimSynapse.RegionsAndTerritories.Placement;
@@ -26,14 +24,6 @@ namespace RimSynapse.RegionsAndTerritories
     /// </summary>
     public static class MilitaryReachUtility
     {
-        // The province adjacency map is expensive to derive (SynapseRegionManager.AreProvincesAdjacent
-        // is a tile-by-tile comparison of two provinces) and never changes after worldgen, so it is
-        // built once per world and held. Keyed on the world instance rather than on a bool, because
-        // the failure this guards against is a second save loading into a stale map — a bug that
-        // would present as military reach obeying the previous game's geography.
-        private static object cachedWorld;
-        private static Dictionary<int, List<int>> cachedAdjacency;
-
         /// <summary>
         /// Can <paramref name="faction"/> reach <paramref name="targetTileId"/> from
         /// <paramref name="sourceTileId"/>, and in what state does the force arrive?
@@ -72,13 +62,9 @@ namespace RimSynapse.RegionsAndTerritories
         {
             if (regionManager == null) return null;
 
-            Dictionary<int, List<int>> adjacency = Adjacency(regionManager);
-
             return new SupplyNetwork
             {
-                Neighbours = provinceId => adjacency.ContainsKey(provinceId)
-                    ? (IEnumerable<int>)adjacency[provinceId]
-                    : new int[0],
+                Neighbours = provinceId => ProvinceAdjacency.NeighboursOf(regionManager, provinceId),
                 ControlOf = (provinceId, faction) => ControlOf(regionManager, provinceId, faction as Faction)
             };
         }
@@ -95,61 +81,10 @@ namespace RimSynapse.RegionsAndTerritories
             return RegionalOwnershipUtility.GetControl(province, faction);
         }
 
-        /// <summary>
-        /// Province adjacency for the whole map, derived once by walking tiles rather than by
-        /// comparing every province against every other. Building it the direct way is
-        /// O(provinces² × tiles²); walking each tile's own neighbours and recording which province
-        /// each lands in is O(tiles), which is the difference between a lazy cache and a stutter.
-        /// </summary>
-        private static Dictionary<int, List<int>> Adjacency(SynapseRegionManager regionManager)
-        {
-            object world = Find.World;
-            if (cachedAdjacency != null && ReferenceEquals(cachedWorld, world)) return cachedAdjacency;
-
-            var adjacency = new Dictionary<int, List<int>>();
-            WorldGrid grid = Find.WorldGrid;
-
-            foreach (GeographicProvince province in regionManager.Provinces)
-            {
-                if (province == null) continue;
-                if (!adjacency.ContainsKey(province.id)) adjacency[province.id] = new List<int>();
-            }
-
-            if (grid != null)
-            {
-                var neighbourTiles = new List<PlanetTile>();
-
-                foreach (GeographicProvince province in regionManager.Provinces)
-                {
-                    if (province == null || province.tiles == null) continue;
-
-                    List<int> edges = adjacency[province.id];
-
-                    foreach (int tile in province.tiles)
-                    {
-                        neighbourTiles.Clear();
-                        grid.GetTileNeighbors(tile, neighbourTiles);
-
-                        foreach (PlanetTile neighbour in neighbourTiles)
-                        {
-                            int other = regionManager.GetProvinceId(neighbour);
-                            if (other < 0 || other == province.id) continue;
-                            if (!edges.Contains(other)) edges.Add(other);
-                        }
-                    }
-                }
-            }
-
-            cachedWorld = world;
-            cachedAdjacency = adjacency;
-            return adjacency;
-        }
-
-        /// <summary>Drop the cached map. Called when a world is discarded or provinces regenerate.</summary>
+        /// <summary>Drop the cached geography. Kept as the military-side name for the shared cache.</summary>
         public static void ClearCache()
         {
-            cachedWorld = null;
-            cachedAdjacency = null;
+            ProvinceAdjacency.ClearCache();
         }
     }
 }

@@ -29,6 +29,16 @@ namespace RimSynapse.RegionsAndTerritories.Placement
         /// <summary>Perimeter tiles of every province the faction holds. Supply lines run from these.</summary>
         public Func<object, IEnumerable<int>> HeldBorderTiles;
 
+        /// <summary>
+        /// Every province the faction holds or co-holds. Expansion runs outward from these.
+        ///
+        /// Distinct from the provinces its holdings sit in, and that difference is the whole of Epic
+        /// 5 child 3: a province can be held on ownership score or on a worldgen ownership entry with
+        /// no world object of the faction's inside it, and such a province is territory whose border
+        /// the faction may expand across.
+        /// </summary>
+        public Func<object, IEnumerable<int>> HeldProvinceIds;
+
         /// <summary>Whether two provinces share a border.</summary>
         public Func<int, int, bool> ProvincesAdjacent;
 
@@ -61,6 +71,11 @@ namespace RimSynapse.RegionsAndTerritories.Placement
         public IEnumerable<int> BorderTilesFor(object faction)
         {
             return HeldBorderTiles == null ? new int[0] : (HeldBorderTiles(faction) ?? new int[0]);
+        }
+
+        public IEnumerable<int> HeldProvincesFor(object faction)
+        {
+            return HeldProvinceIds == null ? new int[0] : (HeldProvinceIds(faction) ?? new int[0]);
         }
 
         public bool AreAdjacent(int a, int b)

@@ -171,6 +171,12 @@ namespace RimSynapse.RegionsAndTerritories
             }
 
             provinces.Clear();
+
+            // The derived adjacency map describes the province layout we are about to replace, and
+            // it is keyed on the world instance rather than on the provinces — so regenerating
+            // inside one world is the one case the key cannot catch.
+            ProvinceAdjacency.ClearCache();
+
             int provinceIdCounter = 0;
 
             // Pre-calculate river neighbor count for all tiles
