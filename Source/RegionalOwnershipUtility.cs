@@ -39,6 +39,35 @@ namespace RimSynapse.RegionsAndTerritories
             return entry != null ? entry.TotalScore : 0f;
         }
 
+        /// <summary>
+        /// The highest score held by anyone other than <paramref name="faction"/>, 0 if it has the
+        /// province to itself.
+        ///
+        /// The faction's own entry is skipped explicitly. Holding a province harder must never read
+        /// as more pressure on yourself — that inversion is the obvious way to get every consumer of
+        /// this number backwards at once, and there are now two of them: Epic 3's derived security
+        /// and Epic 3 child 6's interception. Null and factionless entries are stepped over rather
+        /// than thrown on, because ownership data is rebuilt from live world objects and a holding
+        /// can lose its faction between one rebuild and the next.
+        ///
+        /// The strongest rival, not the sum of them: three weak neighbours are not equivalent to one
+        /// strong one, and summing would make a crowded map uniformly hostile.
+        /// </summary>
+        public float StrongestRivalScore(Faction faction)
+        {
+            if (factionScores == null) return 0f;
+
+            float strongest = 0f;
+            foreach (var score in factionScores)
+            {
+                if (score == null || score.faction == null) continue;
+                if (score.faction == faction) continue;
+                if (score.TotalScore > strongest) strongest = score.TotalScore;
+            }
+
+            return strongest;
+        }
+
         /// <summary>Every faction scoring above the ownership threshold, strongest first.</summary>
         public List<FactionOwnershipScore> Contenders()
         {

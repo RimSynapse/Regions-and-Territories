@@ -89,23 +89,19 @@ namespace RimSynapse.RegionsAndTerritories
         /// score is a point off yours. A contested border province is therefore genuinely less
         /// productive than a quiet interior one, which is the behaviour the child asked for, without
         /// a new subsystem to keep in sync.
+        ///
+        /// <para>Note what the null guard costs: no data reads as <i>zero</i> security, not full,
+        /// because a caller with nothing to go on should not be told the province is safe. That is
+        /// also why <c>ProductionRules.MaxInsecurityPenalty</c> is parked at zero — under this
+        /// formulation a penalty would fall on every province nobody has measured yet. Child 6's
+        /// interception avoids the problem by reading <c>StrongestRivalScore</c> directly rather than
+        /// through this inversion.</para>
         /// </summary>
         public static float SecurityOf(RegionalOwnershipData data, Faction faction)
         {
             if (data == null || faction == null) return 0f;
 
-            float strongestRival = 0f;
-            if (data.factionScores != null)
-            {
-                foreach (var score in data.factionScores)
-                {
-                    if (score == null || score.faction == null) continue;
-                    if (score.faction == faction) continue;
-                    if (score.TotalScore > strongestRival) strongestRival = score.TotalScore;
-                }
-            }
-
-            float security = 1f - strongestRival;
+            float security = 1f - data.StrongestRivalScore(faction);
             if (security < 0f) return 0f;
             if (security > 1f) return 1f;
             return security;

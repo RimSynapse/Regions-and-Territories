@@ -1,6 +1,6 @@
 # Behaviour tests
 
-283 assertions that run without RimWorld, Unity, Harmony, or a game install.
+315 assertions that run without RimWorld, Unity, Harmony, or a game install.
 
 ```
 sudo apt-get install -y mono-mcs mono-runtime   # once, on WSL or Linux
@@ -27,10 +27,12 @@ rather than hunt constants through patch files.
 | `PlacementTests` | where a faction may and may not put a holding |
 | `SizingTests` | settlement tiers, their thresholds and their production scale |
 | `EconomyTests` | resource pools, depletion, renewal, scanning, and the production factors |
+| `TaxationTests` | how much of a levy reaches the capital, and why growing a city is not a trap |
 | `ScalingTests` | the derived security rule and the Empire resource-name table |
 
 The type-check at the end of the run is not a behaviour test. It compiles the impure files —
-`WorldObjectPlacementUtility`, `SettlementSizeUtility`, `ProductionScalingUtility`, the Empire patch
+`WorldObjectPlacementUtility`, `SettlementSizeUtility`, `ProductionScalingUtility`, `TaxationUtility`,
+the Empire patch
 — against stub signatures written from the real ones. It cannot tell you a patch is correct. It can
 tell you a patch calls a method that no longer exists, which is otherwise invisible until RimWorld
 loads the assembly and Harmony throws.
