@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RimWorld;
 using RimWorld.Planet;
+using RimSynapse.RegionsAndTerritories.Economy;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories
@@ -85,14 +86,90 @@ namespace RimSynapse.RegionsAndTerritories
             }
         }
 
-        public float rawNutrition;
-        public float biomass;
-        public float minerals;
-        public float textiles;
+        // --- Resource pools (0.7 Epic 3) --------------------------------------
+        //
+        // Pre-0.7 these were seven bare floats meaning "how much is here". They now each carry a
+        // cap and a current stock, because the economy needs to be able to draw a province down.
+        //
+        // The old field names survive as properties returning the *current* stock, which is what
+        // every existing reader already meant by them — Empire's production scaling asks "how much
+        // minerals does this province have", and the honest answer once depletion exists is what is
+        // left, not what the terrain could hold. So the fourteen call sites need no edits and get
+        // the new behaviour for free.
+        //
+        // The old save keys are reused for the caps, so a 0.6 save's single number loads as the
+        // ceiling and ResourcePool.EnsureSeeded fills the stock to match. Nothing to migrate.
 
-        public float preIndustrialGoods;
-        public float industrialGoods;
-        public float spacerGoods;
+        private readonly ResourcePool[] pools = CreatePools();
+
+        private static ResourcePool[] CreatePools()
+        {
+            var created = new ResourcePool[7];
+            for (int i = 0; i < created.Length; i++) created[i] = new ResourcePool();
+            return created;
+        }
+
+        /// <summary>The cap-and-stock pool for a resource. Never null.</summary>
+        public ResourcePool Pool(ResourceKind kind)
+        {
+            int index = (int)kind;
+            if (index < 0 || index >= pools.Length) return pools[0];
+            return pools[index];
+        }
+
+        /// <summary>What the terrain here can hold, as opposed to what is left of it.</summary>
+        public float CapOf(ResourceKind kind)
+        {
+            return Pool(kind).cap;
+        }
+
+        /// <summary>How full this resource is, 0 to 1. Feeds UI and depletion-aware production.</summary>
+        public float FractionOf(ResourceKind kind)
+        {
+            return Pool(kind).Fraction;
+        }
+
+        public float rawNutrition
+        {
+            get { return Pool(ResourceKind.Nutrition).current; }
+            set { Pool(ResourceKind.Nutrition).current = value; }
+        }
+
+        public float biomass
+        {
+            get { return Pool(ResourceKind.Biomass).current; }
+            set { Pool(ResourceKind.Biomass).current = value; }
+        }
+
+        public float minerals
+        {
+            get { return Pool(ResourceKind.Minerals).current; }
+            set { Pool(ResourceKind.Minerals).current = value; }
+        }
+
+        public float textiles
+        {
+            get { return Pool(ResourceKind.Textiles).current; }
+            set { Pool(ResourceKind.Textiles).current = value; }
+        }
+
+        public float preIndustrialGoods
+        {
+            get { return Pool(ResourceKind.PreIndustrialGoods).current; }
+            set { Pool(ResourceKind.PreIndustrialGoods).current = value; }
+        }
+
+        public float industrialGoods
+        {
+            get { return Pool(ResourceKind.IndustrialGoods).current; }
+            set { Pool(ResourceKind.IndustrialGoods).current = value; }
+        }
+
+        public float spacerGoods
+        {
+            get { return Pool(ResourceKind.SpacerGoods).current; }
+            set { Pool(ResourceKind.SpacerGoods).current = value; }
+        }
 
         public List<SettlementCrisis> activeCrises = new List<SettlementCrisis>();
 
@@ -121,19 +198,39 @@ namespace RimSynapse.RegionsAndTerritories
             Scribe_Values.Look(ref _totalDwellings, "totalDwellings", 0);
             Scribe_Values.Look(ref _currentPopulation, "currentPopulation", 0);
 
-            Scribe_Values.Look(ref rawNutrition, "rawNutrition", 0f);
-            Scribe_Values.Look(ref biomass, "biomass", 0f);
-            Scribe_Values.Look(ref minerals, "minerals", 0f);
-            Scribe_Values.Look(ref textiles, "textiles", 0f);
-
-            Scribe_Values.Look(ref preIndustrialGoods, "preIndustrialGoods", 0f);
-            Scribe_Values.Look(ref industrialGoods, "industrialGoods", 0f);
-            Scribe_Values.Look(ref spacerGoods, "spacerGoods", 0f);
+            ScribePool(ResourceKind.Nutrition, "rawNutrition");
+            ScribePool(ResourceKind.Biomass, "biomass");
+            ScribePool(ResourceKind.Minerals, "minerals");
+            ScribePool(ResourceKind.Textiles, "textiles");
+            ScribePool(ResourceKind.PreIndustrialGoods, "preIndustrialGoods");
+            ScribePool(ResourceKind.IndustrialGoods, "industrialGoods");
+            ScribePool(ResourceKind.SpacerGoods, "spacerGoods");
 
             Scribe_Collections.Look(ref activeCrises, "activeCrises", LookMode.Deep);
             if (activeCrises == null)
             {
                 activeCrises = new List<SettlementCrisis>();
+            }
+        }
+
+        /// <summary>
+        /// Save one resource pool under the key the bare float used to occupy.
+        ///
+        /// The cap keeps the old key, so a 0.6 save's single number is read back as the ceiling and
+        /// the stock — written under a new key that is absent from old saves — comes back as
+        /// <c>Unseeded</c> and is filled to the cap. A province that a 0.7 game genuinely mined out
+        /// saves a real 0 and reloads as mined out, because 0 and "never written" are different
+        /// values. That distinction is the entire migration.
+        /// </summary>
+        private void ScribePool(ResourceKind kind, string key)
+        {
+            ResourcePool pool = Pool(kind);
+            Scribe_Values.Look(ref pool.cap, key, 0f);
+            Scribe_Values.Look(ref pool.current, key + "Current", ResourcePool.Unseeded);
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit || Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                pool.EnsureSeeded();
             }
         }
 
@@ -197,20 +294,37 @@ namespace RimSynapse.RegionsAndTerritories
             bool isSpacer = maxTech >= TechLevel.Spacer;
             bool isIndustrial = maxTech == TechLevel.Industrial;
 
+            // 0.7: these figures are now the *ceiling* the terrain imposes rather than the stock
+            // itself. SetCap fills a fresh province to the brim and clamps an existing one down, so
+            // re-running this on a province that has already been worked does not refill it.
+            float nutritionCap;
             if (isSpacer)
-                rawNutrition = 1000f * tiles.Count;
+                nutritionCap = 1000f * tiles.Count;
             else if (isIndustrial)
-                rawNutrition = avgPlant * 500f * tiles.Count;
+                nutritionCap = avgPlant * 500f * tiles.Count;
             else
-                rawNutrition = avgForage * 500f * tiles.Count;
+                nutritionCap = avgForage * 500f * tiles.Count;
 
-            biomass = avgTree * 500f * tiles.Count;
-            minerals = avgHill * 500f * tiles.Count;
-            textiles = 100f * tiles.Count;
+            SetInitialCap(ResourceKind.Nutrition, nutritionCap);
+            SetInitialCap(ResourceKind.Biomass, avgTree * 500f * tiles.Count);
+            SetInitialCap(ResourceKind.Minerals, avgHill * 500f * tiles.Count);
+            SetInitialCap(ResourceKind.Textiles, 100f * tiles.Count);
 
-            preIndustrialGoods = 0f;
-            industrialGoods = 0f;
-            spacerGoods = 0f;
+            SetInitialCap(ResourceKind.PreIndustrialGoods, 0f);
+            SetInitialCap(ResourceKind.IndustrialGoods, 0f);
+            SetInitialCap(ResourceKind.SpacerGoods, 0f);
+        }
+
+        /// <summary>
+        /// Set a resource's ceiling, filling the stock to match only if it has never been set.
+        /// A province being re-assessed keeps whatever it has left.
+        /// </summary>
+        private void SetInitialCap(ResourceKind kind, float cap)
+        {
+            ResourcePool pool = Pool(kind);
+            bool fresh = pool.current < 0f;
+            pool.SetCap(cap);
+            if (fresh) pool.current = pool.cap;
         }
     }
 }

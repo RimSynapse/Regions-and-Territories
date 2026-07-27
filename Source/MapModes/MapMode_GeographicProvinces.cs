@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MapModeFramework;
 using Region = MapModeFramework.Region;
+using RimSynapse.RegionsAndTerritories.Economy;
 using RimWorld;
 using RimWorld.Planet;
 using UnityEngine;
@@ -182,10 +183,13 @@ namespace RimSynapse.RegionsAndTerritories
             sb.AppendLine("--- Regional Economics ---");
             sb.AppendLine($"Population: {province.currentPopulation}");
             sb.AppendLine($"Housing Capacity: {province.totalDwellings * 2}");
-            sb.AppendLine($"Nutrition: {province.rawNutrition:F0}");
-            sb.AppendLine($"Biomass: {province.biomass:F0}");
-            sb.AppendLine($"Minerals: {province.minerals:F0}");
-            sb.AppendLine($"Textiles: {province.textiles:F0}");
+            // 0.7: show the stock against the ceiling the terrain imposes. A bare number cannot
+            // tell the player whether a province is rich or merely untouched, and depletion is
+            // invisible without something to measure it against.
+            sb.AppendLine(ResourceDisplay.Line(province.Pool(ResourceKind.Nutrition), "Nutrition"));
+            sb.AppendLine(ResourceDisplay.Line(province.Pool(ResourceKind.Biomass), "Biomass"));
+            sb.AppendLine(ResourceDisplay.Line(province.Pool(ResourceKind.Minerals), "Minerals"));
+            sb.AppendLine(ResourceDisplay.Line(province.Pool(ResourceKind.Textiles), "Textiles"));
             sb.AppendLine();
             sb.AppendLine("--- Produced Goods ---");
             sb.AppendLine($"Pre-Industrial Goods: {province.preIndustrialGoods:F0}");
