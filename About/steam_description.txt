@@ -75,7 +75,7 @@ These ship when they are ready - no dates.
 [*] [b]Anomaly DLC:[/b] Compatible
 [*] [b]Odyssey DLC:[/b] Fully Compatible and Optimized. Space factions are generated on the Orbit layer naturally, and terrestrial factions generate on the Surface layer.
 [*] [b]Map Mode Framework:[/b] Required for the map mode overlays.
-[*] [b]Existing saves:[/b] Not supported - a new colony is required. See the notice at the top of this page.
+[*] [b]Existing saves:[/b] Not supported - Regions and Territories draws its provinces and places faction settlements during world generation, so it needs a new colony. Adding it partway through a playthrough will not work correctly.
 [/list]
 
 ---
