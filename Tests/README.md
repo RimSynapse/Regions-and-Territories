@@ -1,6 +1,6 @@
 # Behaviour tests
 
-430 assertions that run without RimWorld, Unity, Harmony, or a game install.
+174 assertions that run without RimWorld, Unity, Harmony, or a game install.
 
 ```
 sudo apt-get install -y mono-mcs mono-runtime   # once, on WSL or Linux
@@ -11,11 +11,10 @@ Exit code is zero only if every suite builds and every assertion holds.
 
 ## Why this can exist at all
 
-The 0.7 rules layers are deliberately dependency-free. `Source/Integration/`, `Source/Placement/`,
-`Source/Sizing/`, `Source/Economy/`, `Source/Military/` and `Source/Standing/` contain no `Find`, no
-Harmony attributes, no Unity types and
-no `TechLevel`; they receive world state as plain numbers or `Func` delegates, and exactly one
-façade file per subsystem touches the game. That separation is the reason the rules can be compiled
+The 0.7 rules layers are deliberately dependency-free. `Source/Integration/`, `Source/Placement/`
+and `Source/Economy/` contain no `Find`, no Harmony attributes, no Unity types and no `TechLevel`;
+they receive world state as plain numbers or `Func` delegates, and exactly one façade file per
+subsystem touches the game. That separation is the reason the rules can be compiled
 against the hand-written doubles in `RimWorldStubs.cs` and executed anywhere. It is also the
 precondition for 0.8's Logic Externalization, which needs to move one rule table per subsystem
 rather than hunt constants through patch files.
@@ -26,12 +25,13 @@ rather than hunt constants through patch files.
 |---|---|
 | `IntegrationTests` | world-object classification and the known-mod profile table |
 | `PlacementTests` | where a faction may and may not put a holding |
-| `SizingTests` | settlement tiers, their thresholds and their production scale |
-| `EconomyTests` | resource pools, depletion, renewal, scanning, and the production factors |
-| `TaxationTests` | how much of a levy reaches the capital, and why growing a city is not a trap |
-| `MilitaryTests` | how far a faction can project force, and what holding the ground in between buys |
-| `StandingTests` | the per-faction summary R&T publishes for other mods, and how strong it makes a faction look |
-| `ScalingTests` | the derived security rule and the Empire resource-name table |
+| `ResourceTests` | resource pools, depletion, renewal, scanning and sustainable population |
+
+Sizing, production, taxation, military reach and standing moved to the **Factions** repo in 0.7
+along with their code, and their suites went with them — see `Factions/Tests`. What stayed here is
+the world layer: what a world object *is*, where it may stand, and what is in the ground under it.
+`ResourceTests` is the half of the old `EconomyTests` that describes province state; the half that
+described what a faction extracts is now `Factions/Tests/ProductionTests.cs`.
 
 The type-check at the end of the run is not a behaviour test. It compiles the impure files —
 `WorldObjectPlacementUtility`, `SettlementSizeUtility`, `ProductionScalingUtility`, `TaxationUtility`,

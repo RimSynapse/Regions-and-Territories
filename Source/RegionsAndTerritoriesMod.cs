@@ -67,31 +67,7 @@ namespace RimSynapse.RegionsAndTerritories
         {
             try
             {
-                var resourceFcType = GenTypes.GetTypeInAnyAssembly("FactionColonies.ResourceFC");
-                var settlementMilitaryType = GenTypes.GetTypeInAnyAssembly("FactionColonies.WorldObjectComp_SettlementMilitary");
 
-                if (resourceFcType != null)
-                {
-                    var originalBase = AccessTools.Method(resourceFcType, "CalculateProductionBase");
-                    if (originalBase != null)
-                    {
-                        var postfix = new HarmonyMethod(typeof(Patches.RegionsAndTerritories_EmpiresPatch), nameof(Patches.RegionsAndTerritories_EmpiresPatch.CalculateProductionBase_Postfix));
-                        harmony.Patch(originalBase, postfix: postfix);
-                        Log.Message("[RimSynapse-RegionsAndTerritories] Dynamically patched ResourceFC.CalculateProductionBase successfully.");
-                    }
-
-                    var originalMult = AccessTools.Method(resourceFcType, "CalculateProductionMult");
-                    if (originalMult != null)
-                    {
-                        var postfix = new HarmonyMethod(typeof(Patches.RegionsAndTerritories_EmpiresPatch), nameof(Patches.RegionsAndTerritories_EmpiresPatch.CalculateProductionMult_Postfix));
-                        harmony.Patch(originalMult, postfix: postfix);
-                        Log.Message("[RimSynapse-RegionsAndTerritories] Dynamically patched ResourceFC.CalculateProductionMult successfully.");
-                    }
-                }
-                else
-                {
-                    Log.Message("[RimSynapse-RegionsAndTerritories] Empires mod not detected for ResourceFC. Skipping resource dynamic patching.");
-                }
 
                 var rewardDefType = GenTypes.GetTypeInAnyAssembly("FactionColonies.ResourceEventRewardDef");
                 if (rewardDefType != null)
@@ -125,27 +101,6 @@ namespace RimSynapse.RegionsAndTerritories
                     }
                 }
 
-                if (settlementMilitaryType != null)
-                {
-                    var originalSendMilitary = AccessTools.Method(settlementMilitaryType, "SendMilitary", new Type[] { 
-                        GenTypes.GetTypeInAnyAssembly("FactionColonies.MercenarySquadFC"),
-                        GenTypes.GetTypeInAnyAssembly("FactionColonies.PlanetTile") ?? GenTypes.GetTypeInAnyAssembly("RimWorld.Planet.PlanetTile"),
-                        GenTypes.GetTypeInAnyAssembly("FactionColonies.MilitaryJobDef"),
-                        typeof(int),
-                        typeof(Faction)
-                    });
-
-                    if (originalSendMilitary != null)
-                    {
-                        var prefix = new HarmonyMethod(typeof(Patches.RegionsAndTerritories_EmpiresPatch), nameof(Patches.RegionsAndTerritories_EmpiresPatch.SendMilitary_Prefix));
-                        harmony.Patch(originalSendMilitary, prefix: prefix);
-                        Log.Message("[RimSynapse-RegionsAndTerritories] Dynamically patched SettlementMilitary.SendMilitary successfully.");
-                    }
-                    else
-                    {
-                        Log.Warning("[RimSynapse-RegionsAndTerritories] Could not find specific SendMilitary method overload in SettlementMilitary.");
-                    }
-                }
 
                 var checkerType = GenTypes.GetTypeInAnyAssembly("FactionColonies.util.WorldTileChecker");
                 var defType = GenTypes.GetTypeInAnyAssembly("FactionColonies.WorldSettlementDef");

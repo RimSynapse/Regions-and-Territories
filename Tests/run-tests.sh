@@ -47,35 +47,9 @@ run_suite placement \
     Tests/RimWorldStubs.cs Tests/PlacementTests.cs \
     $SRC/Integration/*.cs $SRC/Placement/*.cs
 
-run_suite sizing \
-    Tests/RimWorldStubs.cs Tests/SizingTests.cs \
-    $SRC/Integration/*.cs $SRC/Sizing/*.cs
-
-run_suite economy \
-    Tests/RimWorldStubs.cs Tests/EconomyTests.cs \
-    $SRC/Integration/*.cs $SRC/Sizing/*.cs $SRC/Economy/*.cs
-
-run_suite taxation \
-    Tests/RimWorldStubs.cs Tests/TaxationTests.cs \
-    $SRC/Integration/*.cs $SRC/Sizing/*.cs $SRC/Economy/*.cs
-
-run_suite military \
-    Tests/RimWorldStubs.cs Tests/MilitaryTests.cs \
-    $SRC/Integration/*.cs $SRC/Placement/*.cs $SRC/Military/*.cs
-
-run_suite standing \
-    Tests/RimWorldStubs.cs Tests/StandingTests.cs \
-    $SRC/Integration/*.cs $SRC/Placement/*.cs $SRC/Sizing/*.cs $SRC/Standing/*.cs
-
-run_suite scaling \
-    Tests/RimWorldStubs.cs Tests/RimWorldStubsExt.cs Tests/ScalingTests.cs \
-    $SRC/Integration/*.cs $SRC/Placement/*.cs $SRC/Sizing/*.cs $SRC/Economy/*.cs $SRC/Military/*.cs \
-    $SRC/Standing/*.cs \
-    $SRC/WorldObjectPlacementUtility.cs $SRC/OutpostPlacementUtility.cs \
-    $SRC/SettlementSizeUtility.cs $SRC/RegionalOwnershipUtility.cs \
-    $SRC/GeographicProvince.cs $SRC/IRegionDemographicProvider.cs \
-    $SRC/ProductionScalingUtility.cs $SRC/TaxationUtility.cs \
-    $SRC/MilitaryReachUtility.cs $SRC/ProvinceAdjacency.cs $SRC/FactionStandingUtility.cs
+run_suite resource \
+    Tests/RimWorldStubs.cs Tests/ResourceTests.cs \
+    $SRC/Integration/*.cs $SRC/Economy/*.cs
 
 # Not a suite: a type-check over the impure files that cannot be behaviour-tested without a running
 # game, but whose signatures can still be held to the shapes they will really meet. This is what
@@ -86,13 +60,11 @@ echo "== type-check (impure files, signatures only) =="
 rm -f "$OUT/typecheck.dll"
 if mcs -target:library -langversion:latest -nowarn:0169,0414,0649,0219,0067 -out:"$OUT/typecheck.dll" \
     Tests/RimWorldStubs.cs Tests/RimWorldStubsExt.cs \
-    $SRC/Integration/*.cs $SRC/Placement/*.cs $SRC/Sizing/*.cs $SRC/Economy/*.cs $SRC/Military/*.cs \
-    $SRC/Standing/*.cs \
+    $SRC/Integration/*.cs $SRC/Placement/*.cs $SRC/Economy/*.cs \
     $SRC/WorldObjectPlacementUtility.cs $SRC/OutpostPlacementUtility.cs \
-    $SRC/SettlementSizeUtility.cs $SRC/RegionalOwnershipUtility.cs \
+    $SRC/RegionalOwnershipUtility.cs \
     $SRC/GeographicProvince.cs $SRC/IRegionDemographicProvider.cs \
-    $SRC/ProductionScalingUtility.cs $SRC/TaxationUtility.cs \
-    $SRC/MilitaryReachUtility.cs $SRC/ProvinceAdjacency.cs $SRC/FactionStandingUtility.cs \
+    $SRC/ProvinceAdjacency.cs \
     $SRC/Patches/RegionsAndTerritories_EmpiresPatch.cs \
     $SRC/Patches/Patch_TileFinder_IsValidTileForNewSettlement.cs \
     $SRC/Patches/Patch_WorldInspectPane_TileInspectString.cs; then

@@ -4,7 +4,6 @@ using RimWorld;
 using RimWorld.Planet;
 using RimSynapse.RegionsAndTerritories.Integration;
 using RimSynapse.RegionsAndTerritories.Placement;
-using RimSynapse.RegionsAndTerritories.Sizing;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories.Patches
@@ -56,31 +55,12 @@ namespace RimSynapse.RegionsAndTerritories.Patches
                 sb.AppendLine("Pawn dwellings: " + pop);
             }
 
-            AppendSettlementSize(sb, tileId);
             AppendTerritoryInfo(sb, tileId);
 
             cachedTileId = tileId;
             cachedAtTick = now;
             cachedText = sb.ToString().TrimEnd();
             return cachedText;
-        }
-
-        /// <summary>
-        /// 0.7 Epic 4: name the size of whatever stands on this tile.
-        ///
-        /// The tier is derived, not stored, so this is the only place the player ever sees it — and
-        /// it has to be legible for any mod's holding, which is why it comes from the same evaluator
-        /// the economy will read rather than from a concrete settlement type.
-        /// </summary>
-        private static void AppendSettlementSize(StringBuilder sb, int tileId)
-        {
-            if (!WorldObjectIntegrationSettings.SettlementTiersActive) return;
-
-            SettlementTier tier;
-            WorldObject obj = SettlementSizeUtility.LargestTieredObjectAt(tileId, out tier);
-            if (obj == null || tier == SettlementTier.None) return;
-
-            sb.AppendLine("Settlement size: " + tier.LabelCapitalized());
         }
 
         /// <summary>
