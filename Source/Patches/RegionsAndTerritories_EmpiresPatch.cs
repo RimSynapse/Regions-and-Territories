@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
@@ -11,30 +10,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
 {
     public static class RegionsAndTerritories_EmpiresPatch
     {
-        private static int GetTileSafe(object obj)
-        {
-            if (obj == null) return -1;
-            
-            // Try property first
-            var prop = obj.GetType().GetProperty("Tile", BindingFlags.Public | BindingFlags.Instance);
-            if (prop != null)
-            {
-                var val = prop.GetValue(obj);
-                if (val is int iVal) return iVal;
-            }
-            
-            // Try field
-            var field = obj.GetType().GetField("Tile", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-            if (field != null)
-            {
-                var val = field.GetValue(obj);
-                if (val is int iVal) return iVal;
-            }
-            
-            return -1;
-        }
-
-        private static string GetDefNameSafe(object obj)
+        public static string GetDefNameSafe(object obj)
         {
             if (obj == null) return null;
             
@@ -55,173 +31,17 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             return null;
         }
 
-        public static double CalculateProductionBase_Postfix(double __result, object __instance)
-        {
-            try
-            {
-                if (__instance == null) return __result;
+        // 0.7: CalculateProductionBase_Postfix, CalculateProductionMult_Postfix and
+        // SendMilitary_Prefix moved to RimSynapse.Factions.Patches.Factions_EmpirePatch when
+        // production, taxation, military reach and standing moved to the Factions mod. They called
+        // ProductionScalingUtility and MilitaryReachUtility, so keeping them here would have made
+        // this mod depend on the one that already hard-depends on it. GetDefNameSafe and
+        // GetPlayerFaction are public because that patch calls them rather than keeping a second
+        // copy — two copies of a reflection accessor is how the two drift apart.
+        //
+        // GetResourceScale lived here until 0.7 and is now Factions' ProductionEvaluator
+        // .AbundanceFactor, with its constants in ProductionRules, unchanged to the digit.
 
-                // Extract settlement from ResourceFC instance
-                var settlementField = __instance.GetType().GetField("settlement", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (settlementField == null) return __result;
-                var settlement = settlementField.GetValue(__instance);
-                if (settlement == null) return __result;
-
-                // Extract Tile from WorldObject/Settlement
-                int tileId = GetTileSafe(settlement);
-                if (tileId == -1) return __result;
-
-                // Extract def (ResourceTypeDef) from ResourceFC
-                var defField = __instance.GetType().GetField("def", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (defField == null) return __result;
-                var def = defField.GetValue(__instance);
-                if (def == null) return __result;
-
-                string defName = GetDefNameSafe(def);
-                if (string.IsNullOrEmpty(defName)) return __result;
-
-                if (Find.World == null) return __result;
-                var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                if (regionManager == null) return __result;
-
-                var province = regionManager.GetProvinceForTile(tileId);
-                if (province == null) return __result;
-
-                // Apply dynamic scaling to base production based on the Geographic Province's actual resources
-                float modifier = 1.0f;
-                switch (defName)
-                {
-                    case "RTD_Food":
-                    case "RTD_Animals":
-                        modifier = GetResourceScale(province.rawNutrition, 1000f);
-                        break;
-                    case "RTD_Logging":
-                        modifier = GetResourceScale(province.biomass, 500f);
-                        break;
-                    case "RTD_Mining":
-                        modifier = GetResourceScale(province.minerals, 500f);
-                        break;
-                    case "RTD_Apparel":
-                        modifier = GetResourceScale(province.textiles, 100f);
-                        break;
-                    case "RTD_Weapons":
-                        modifier = GetResourceScale(province.preIndustrialGoods, 100f);
-                        break;
-                    case "RTD_Medicine":
-                        modifier = GetResourceScale(province.industrialGoods, 100f);
-                        break;
-                    case "RTD_Research":
-                        modifier = GetResourceScale(province.spacerGoods, 100f);
-                        break;
-                }
-
-                return __result * modifier;
-            }
-            catch (Exception ex)
-            {
-                Log.ErrorOnce($"[RimSynapse-RegionsAndTerritories] Error in CalculateProductionBase_Postfix: {ex}", 992388);
-                return __result;
-            }
-        }
-
-        public static double CalculateProductionMult_Postfix(double __result, object __instance)
-        {
-            try
-            {
-                if (__instance == null) return __result;
-
-                var settlementField = __instance.GetType().GetField("settlement", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (settlementField == null) return __result;
-                var settlement = settlementField.GetValue(__instance);
-                if (settlement == null) return __result;
-
-                int tileId = GetTileSafe(settlement);
-                if (tileId == -1) return __result;
-
-                if (Find.World == null) return __result;
-                var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                if (regionManager == null) return __result;
-
-                var province = regionManager.GetProvinceForTile(tileId);
-                if (province == null) return __result;
-
-                // Population density scales the production multiplier (higher population = higher trade efficiency!)
-                // Baseline: 0 population gives 0.8x, 2000+ population gives up to 1.5x
-                float popDensity = province.currentPopulation;
-                float popMult = 0.8f + (popDensity / 2000f);
-                if (popMult > 1.5f) popMult = 1.5f;
-
-                return __result * popMult;
-            }
-            catch (Exception ex)
-            {
-                Log.ErrorOnce($"[RimSynapse-RegionsAndTerritories] Error in CalculateProductionMult_Postfix: {ex}", 992389);
-                return __result;
-            }
-        }
-
-        public static bool SendMilitary_Prefix(object squad, object location, object job, int timeToFinish, Faction enemy)
-        {
-            try
-            {
-                if (location == null) return true;
-
-                // Resolve target tile ID
-                int targetTileId = -1;
-                if (location is int i)
-                {
-                    targetTileId = i;
-                }
-                else
-                {
-                    targetTileId = GetTileSafe(location);
-                }
-
-                if (targetTileId == -1) return true;
-
-                // Resolve source tile ID from squad
-                if (squad == null) return true;
-                var settlementField = squad.GetType().GetField("settlement", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (settlementField == null) return true;
-                var sourceSettlement = settlementField.GetValue(squad);
-                if (sourceSettlement == null) return true;
-
-                int sourceTileId = GetTileSafe(sourceSettlement);
-                if (sourceTileId == -1) return true;
-
-                if (Find.World == null) return true;
-                var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                if (regionManager == null) return true;
-
-                int sourceProvinceId = regionManager.GetProvinceId(sourceTileId);
-                int targetProvinceId = regionManager.GetProvinceId(targetTileId);
-
-                if (sourceProvinceId != -1 && targetProvinceId != -1 && sourceProvinceId != targetProvinceId)
-                {
-                    var sourceProvince = regionManager.Provinces.FirstOrDefault(p => p.id == sourceProvinceId);
-                    var targetProvince = regionManager.Provinces.FirstOrDefault(p => p.id == targetProvinceId);
-                    if (sourceProvince != null && targetProvince != null && !regionManager.AreProvincesAdjacent(sourceProvince, targetProvince))
-                    {
-                        Messages.Message("Cannot launch military operation: Target region is too far. Your military actions must expand sequentially through adjacent regions.", MessageTypeDefOf.RejectInput);
-                        return false; // Cancel SendMilitary execution
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"[RimSynapse-RegionsAndTerritories] Error in SendMilitary_Prefix: {ex}");
-            }
-            return true;
-        }
-
-        private static float GetResourceScale(float value, float baseline)
-        {
-            if (value <= 0f) return 0.2f;
-            float scale = value / baseline;
-            if (scale < 0.2f) return 0.2f;
-            if (scale > 2.0f) return 2.0f;
-            return scale;
-        }
 
         private static T GetFieldValue<T>(object obj, string name, T defaultValue = default)
         {

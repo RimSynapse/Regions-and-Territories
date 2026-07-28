@@ -10,7 +10,9 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPostfix]
         public static void Postfix(WorldObject __instance)
         {
-            if (__instance is Settlement || PopulationDensityUtility.IsVoeOutpost(__instance))
+            // 0.7: any object that contributes residents invalidates the density cache,
+            // not just vanilla settlements and VOE outposts.
+            if (Integration.WorldObjectClassifier.HasPopulation(__instance))
             {
                 PopulationDensityUtility.MarkCacheDirty();
             }
@@ -23,7 +25,9 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPostfix]
         public static void Postfix(WorldObject __instance)
         {
-            if (__instance is Settlement || PopulationDensityUtility.IsVoeOutpost(__instance))
+            // 0.7: any object that contributes residents invalidates the density cache,
+            // not just vanilla settlements and VOE outposts.
+            if (Integration.WorldObjectClassifier.HasPopulation(__instance))
             {
                 PopulationDensityUtility.MarkCacheDirty();
             }

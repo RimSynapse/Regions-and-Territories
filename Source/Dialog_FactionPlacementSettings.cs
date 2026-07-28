@@ -13,7 +13,8 @@ namespace RimSynapse.RegionsAndTerritories
         private Vector2 scrollPosition = Vector2.zero;
         private List<FactionDef> activeFactions;
 
-        public override Vector2 InitialSize => new Vector2(800f, 650f);
+        // 0.7 added the world-object integration panel, so the window needs a little more height.
+        public override Vector2 InitialSize => new Vector2(860f, 780f);
 
         public Dialog_FactionPlacementSettings()
         {
@@ -97,7 +98,9 @@ namespace RimSynapse.RegionsAndTerritories
             Rect estRect = new Rect(10f, 135f, globalBoxRect.width - 20f, 22f);
             Widgets.Label(estRect, $"Estimated Land Tiles: <color=cyan>{landTiles}</color> (at {Mathf.RoundToInt(coverage * 100f)}% coverage) | Expected Region Count: <color=green>{estMin} - {estMax}</color> (Avg Size: {avgSize:F0} tiles)");
 
-            Rect outRect = new Rect(0f, 210f, inRect.width, inRect.height - 265f);
+            DrawIntegrationPanel(new Rect(0f, 205f, inRect.width - 15f, 152f));
+
+            Rect outRect = new Rect(0f, 365f, inRect.width, inRect.height - 420f);
             Rect viewRect = new Rect(0f, 0f, inRect.width - 25f, activeFactions.Count * 265f);
 
             Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect);
@@ -160,6 +163,102 @@ namespace RimSynapse.RegionsAndTerritories
             {
                 this.Close();
             }
+        }
+
+        /// <summary>
+        /// 0.7: switches for the world-object governance layer. Every mod integration and every
+        /// governed mechanic is optional, so a player who only wants vanilla behaviour can get it
+        /// from this panel without uninstalling anything.
+        /// </summary>
+        private void DrawIntegrationPanel(Rect box)
+        {
+            Widgets.DrawMenuSection(box);
+
+            Rect titleRect = new Rect(box.x + 10f, box.y + 4f, box.width - 20f, 22f);
+            Widgets.Label(titleRect, "<b>World Object Mod Integration</b>");
+
+            Rect masterRect = new Rect(box.x + 10f, box.y + 28f, box.width - 20f, 22f);
+            Widgets.CheckboxLabeled(masterRect, "Govern world objects added by other mods",
+                ref Integration.WorldObjectIntegrationSettings.masterEnabled);
+            TooltipHandler.TipRegion(masterRect,
+                "Master switch. When off, Regions & Territories recognises only vanilla settlements and leaves modded outposts, camps, and bases entirely alone.");
+
+            bool on = Integration.WorldObjectIntegrationSettings.masterEnabled;
+            float colW = (box.width - 20f) / 4f;
+
+            // Row 1 — per-mod integrations.
+            float y = box.y + 52f;
+            IntegrationToggle(new Rect(box.x + 10f + colW * 0f, y, colW - 8f, 22f), "Empire Refactored",
+                ref Integration.WorldObjectIntegrationSettings.empireEnabled, on,
+                "Recognise Empire Refactored colonies as settlements and read their settlement level.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 1f, y, colW - 8f, 22f), "Outposts Expanded",
+                ref Integration.WorldObjectIntegrationSettings.voeEnabled, on,
+                "Recognise Vanilla Outposts Expanded outposts, including their occupant count and upgrade level.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 2f, y, colW - 8f, 22f), "Factions Expanded",
+                ref Integration.WorldObjectIntegrationSettings.vfeEnabled, on,
+                "Recognise settlement-, camp-, and base-like world objects from the Vanilla Factions Expanded family.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 3f, y, colW - 8f, 22f), "World Domination",
+                ref Integration.WorldObjectIntegrationSettings.worldDominationEnabled, on,
+                "Recognise World Domination tiered bases. Most of its objects also resolve through the Outposts Expanded integration.");
+
+            // Row 2 — which mechanics the integration is allowed to drive.
+            y += 24f;
+            IntegrationToggle(new Rect(box.x + 10f + colW * 0f, y, colW - 8f, 22f), "Placement rules",
+                ref Integration.WorldObjectIntegrationSettings.placementGovernance, on,
+                "Apply region ownership, buffer distance, and supply range to where modded objects can be built.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 1f, y, colW - 8f, 22f), "Economy rules",
+                ref Integration.WorldObjectIntegrationSettings.economyGovernance, on,
+                "Scale modded production by regional security, local resource richness, and surrounding population.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 2f, y, colW - 8f, 22f), "Military rules",
+                ref Integration.WorldObjectIntegrationSettings.militaryGovernance, on,
+                "Apply adjacency and supply-line limits to modded military and expansion actions.");
+            IntegrationToggle(new Rect(box.x + 10f + colW * 3f, y, colW - 8f, 22f), "Settlement tiers",
+                ref Integration.WorldObjectIntegrationSettings.settlementTiers, on,
+                "Classify settlements as village, town, city, or major city based on population.");
+
+            // Row 3 — diagnostics.
+            y += 24f;
+            Rect logRect = new Rect(box.x + 10f, y, box.width - 20f, 22f);
+            Widgets.CheckboxLabeled(logRect, "Log world object types no integration recognises",
+                ref Integration.WorldObjectIntegrationSettings.logUnknownWorldObjects, !on);
+            TooltipHandler.TipRegion(logRect,
+                "Writes one message per unrecognised type. Useful when reporting a mod that Regions & Territories should support.");
+
+            // Status line — what actually got detected in this game.
+            y += 24f;
+            Rect statusRect = new Rect(box.x + 10f, y, box.width - 20f, 22f);
+            Widgets.Label(statusRect, "Detected: " + DescribeActiveIntegrations());
+        }
+
+        private static void IntegrationToggle(Rect rect, string label, ref bool value, bool enabled, string tooltip)
+        {
+            Widgets.CheckboxLabeled(rect, label, ref value, !enabled);
+            if (!string.IsNullOrEmpty(tooltip))
+            {
+                TooltipHandler.TipRegion(rect, tooltip);
+            }
+        }
+
+        private static string DescribeActiveIntegrations()
+        {
+            var names = new List<string>();
+            foreach (var adapter in Integration.WorldObjectAdapterRegistry.Adapters)
+            {
+                bool active;
+                try { active = adapter.IsActive; }
+                catch (Exception) { active = false; }
+
+                if (active && adapter.AdapterId != "vanilla")
+                {
+                    names.Add(adapter.DisplayName);
+                }
+            }
+
+            if (names.Count == 0)
+            {
+                return "<color=grey>vanilla world objects only</color>";
+            }
+            return "<color=green>" + string.Join(", ", names.ToArray()) + "</color>";
         }
 
         private void DrawWeightSlider(ref float y, float width, float startX, string label, ref float value, float min, float max)

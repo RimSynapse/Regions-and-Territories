@@ -37,7 +37,8 @@ namespace RimSynapse.RegionsAndTerritories
             int count = 0;
             foreach (var obj in Find.WorldObjects.AllWorldObjects)
             {
-                if ((obj is Settlement || obj.GetType().Name == "WorldSettlementFC") && obj.Faction == faction)
+                // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
+                if (Integration.WorldObjectClassifier.IsSettlement(obj) && obj.Faction == faction)
                 {
                     count++;
                 }
@@ -170,6 +171,12 @@ namespace RimSynapse.RegionsAndTerritories
             }
 
             provinces.Clear();
+
+            // The derived adjacency map describes the province layout we are about to replace, and
+            // it is keyed on the world instance rather than on the provinces — so regenerating
+            // inside one world is the one case the key cannot catch.
+            ProvinceAdjacency.ClearCache();
+
             int provinceIdCounter = 0;
 
             // Pre-calculate river neighbor count for all tiles

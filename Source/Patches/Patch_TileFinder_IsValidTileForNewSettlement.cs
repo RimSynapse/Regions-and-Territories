@@ -1,9 +1,9 @@
-using System;
-using System.Linq;
 using System.Text;
 using HarmonyLib;
 using RimWorld;
 using RimWorld.Planet;
+using RimSynapse.RegionsAndTerritories.Integration;
+using RimSynapse.RegionsAndTerritories.Placement;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories.Patches
@@ -16,58 +16,26 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         {
             // If it's already invalid, do nothing
             if (!__result) return;
-            if (tile == null) return;
-
+            // PlanetTile is a struct in 1.6, so the old `tile == null` guard was dead code the
+            // compiler warned about. This is what it was reaching for: reject the invalid tile.
+            if (tile.tileId < 0) return;
             if (Find.World == null) return;
 
-            var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-            if (regionManager == null) return;
+            // No player faction yet means we are still generating the world; faction bases are
+            // placed by FactionPlacementUtility, which has its own rules.
+            Faction player = Faction.OfPlayer;
+            if (player == null) return;
 
-            int tileId = tile.tileId;
-            int provinceId = regionManager.GetProvinceId(tileId);
-            if (provinceId == -1) return;
+            // 0.7: all four rules — buffer, foreign territory, supply range, sequential expansion —
+            // now come from one evaluator shared with every other placement path, so settling and
+            // outpost-building can no longer disagree about the same tile.
+            PlacementDecision decision = WorldObjectPlacementUtility.Evaluate(
+                tile.tileId, player, WorldObjectKind.Settlement);
 
-            var province = regionManager.Provinces.FirstOrDefault(p => p.id == provinceId);
-            if (province == null) return;
-
-            // 1. Found a claimed region, block settling!
-            if (province.owningFactionIds.Any())
+            if (!decision.Allowed)
             {
                 __result = false;
-                reason?.AppendLine("Cannot settle here: This region is claimed by another faction.");
-                return;
-            }
-
-            // 2. Sequential Expansion constraint: must be adjacent to existing territory if we have one
-            var playerBases = Find.WorldObjects.AllWorldObjects
-                .Where(obj => obj.Faction != null && (obj.Faction.IsPlayer || obj.GetType().Name == "WorldSettlementFC"))
-                .ToList();
-
-            if (playerBases.Any())
-            {
-                bool hasFoothold = false;
-                foreach (var pb in playerBases)
-                {
-                    int pbProvinceId = regionManager.GetProvinceId(pb.Tile);
-                    if (pbProvinceId == provinceId)
-                    {
-                        hasFoothold = true;
-                        break;
-                    }
-                    var pbProvince = regionManager.Provinces.FirstOrDefault(p => p.id == pbProvinceId);
-                    if (pbProvince != null && regionManager.AreProvincesAdjacent(pbProvince, province))
-                    {
-                        hasFoothold = true;
-                        break;
-                    }
-                }
-
-                if (!hasFoothold)
-                {
-                    __result = false;
-                    reason?.AppendLine("Cannot settle here: This region is too far from your existing territory. You must expand to adjacent regions first.");
-                    return;
-                }
+                reason?.AppendLine(decision.Reason);
             }
         }
     }

@@ -61,7 +61,11 @@ namespace RimSynapse.RegionsAndTerritories
             Scribe_Values.Look(ref maxRegionSize, "maxRegionSize", 150);
             Scribe_Values.Look(ref maxThreatPercent, "maxThreatPercent", 0.50f);
             Scribe_Values.Look(ref maxSettlementPercentOfRegions, "maxSettlementPercentOfRegions", 0.50f);
-            
+
+            // 0.7: world-object governance / mod-integration switches.
+            Integration.WorldObjectIntegrationSettings.ExposeData();
+
+
             List<FactionPlacementProfile> list = profiles.Values.ToList();
             Scribe_Collections.Look(ref list, "profiles", LookMode.Deep);
             if (Scribe.mode == LoadSaveMode.PostLoadInit && list != null)

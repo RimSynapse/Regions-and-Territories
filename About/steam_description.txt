@@ -1,9 +1,18 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.6.1 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.6.2 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Regions and Territories[/h1]
 [b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
 [b]Overhauls the world map generation with dynamic geographic province generation, world map overlays, and territory borders.[/b]
+
+---
+
+[h2]⚠ Requires a New Colony - Not Save-Game Compatible[/h2]
+[b]Install this before you generate a world, not partway through a playthrough.[/b]
+
+Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. Add it to a world that already exists and the provinces get drawn around settlements that were never placed by any of those rules - so territory ownership, occupancy, and border logic all report results that look broken, because the world they are describing never followed the rules they assume.
+
+Removing it from an in-progress save will log errors about missing province data when that save is next loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
 Regions and Territories divides the globe into dynamic geographic provinces with defined borders, population densities, custom road linkages, and procedurally placed ruins.
 
@@ -26,6 +35,15 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 [*] [b]0.9 - Emergent Systems and Content:[/b] Faction archetypes for each DLC, caravans that travel the world map, settlement crises, faction capitals and travelling leaders, and richer colonist social dynamics.
 [/list]
 These ship when they are ready - no dates.
+
+---
+
+[h2]Changelog (v0.6.2)[/h2]
+[list]
+[*] [b]No gameplay changes.[/b] This release exists so the save-compatibility notice reaches people who already have the mod installed. Nothing in the mod behaves differently.
+[*] [b]NOTICE - the warning is now in the game, not just on this page:[/b] Regions and Territories has always needed a new colony, and this page has said so - but the in-game mod description did not, so anyone who subscribed and never came back here had no way to find out. It now says the same thing here, in the mod list, and in the compatibility matrix.
+[*] [b]Looking ahead to 0.7:[/b] Worlds saved by 0.7 will not read correctly if you roll back to 0.6 - the new regional resource stocks are dropped and mined-out provinces come back full. Loading an existing 0.6 world in 0.7 is fine and stays fine; it is only the way back that breaks.
+[/list]
 
 ---
 
@@ -66,6 +84,7 @@ These ship when they are ready - no dates.
 [*] [b]Anomaly DLC:[/b] Compatible
 [*] [b]Odyssey DLC:[/b] Fully Compatible and Optimized. Space factions are generated on the Orbit layer naturally, and terrestrial factions generate on the Surface layer.
 [*] [b]Map Mode Framework:[/b] Required for the map mode overlays.
+[*] [b]Existing saves:[/b] Not supported - Regions and Territories draws its provinces and places faction settlements during world generation, so it needs a new colony. Adding it partway through a playthrough will not work correctly.
 [/list]
 
 ---

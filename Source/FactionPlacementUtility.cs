@@ -33,7 +33,8 @@ namespace RimSynapse.RegionsAndTerritories
 
             foreach (var obj in Find.WorldObjects.AllWorldObjects)
             {
-                if (obj is Settlement || obj.GetType().Name == "WorldSettlementFC")
+                // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
+                if (Integration.WorldObjectClassifier.IsSettlement(obj))
                 {
                     allPlacedBases.Add(obj.Tile);
                     if (obj.Faction == faction)
