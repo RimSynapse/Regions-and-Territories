@@ -45,11 +45,20 @@
             <Private>false</Private>
         </Reference>
         
-        <!-- Reference Core Mod -->
-        <Reference Include="RimSynapseCore">
-            <HintPath>..\..\Core\Assemblies\RimSynapseCore.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
+        <!--
+            No reference to RimSynapse Core, deliberately.
+
+            This mod is the map-mode connector: geography, provinces, ownership, overlays, roads.
+            It has to build and run on its own, with nothing but Map Mode Framework. It reached into
+            Core's pawn comp until 0.7 for an isResident flag while declaring no dependency on it,
+            which meant a player who installed this without Core got a TypeLoadException during
+            dwelling generation.
+
+            Everything this mod publishes to Core now goes through reflection —
+            RegisterProvidersWithCore() and Residency.ResidencyUtility — so Core stays optional in
+            fact and not just on paper. Do not add this reference back; the compiler is the only
+            thing enforcing it.
+        -->
     </ItemGroup>
 
     <!-- .NET Framework reference assemblies via NuGet: lets the build resolve net47x/net48

@@ -17,12 +17,11 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             {
                 var residentPawns = t.Map.mapPawns.AllPawns
                     .Where(p => p.Faction == t.Faction && p.RaceProps.Humanlike);
-                
+
                 bool hasResident = false;
                 foreach (var p in residentPawns)
                 {
-                    var comp = p.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-                    if (comp != null && comp.isResident)
+                    if (Residency.ResidencyUtility.IsResident(p))
                     {
                         hasResident = true;
                         break;
