@@ -402,7 +402,16 @@ namespace RimSynapse.RegionsAndTerritories.Patches
             return Faction.OfPlayer;
         }
 
-        public static void VOE_CanSpawnOnWithExt_Postfix(object ext, PlanetTile tileIdx, System.Collections.Generic.IEnumerable<Pawn> pawns, ref string __result)
+        /// <summary>
+        /// Postfix on Vanilla Outposts Expanded's <c>Outposts.Utils.CanSpawnOnWithExt</c>.
+        ///
+        /// <para>The third parameter must be named <c>ps</c>, not <c>pawns</c>. Harmony binds
+        /// injected parameters <b>by name</b> against the original method's signature, and VOE calls
+        /// it <c>ps</c> — the mismatch made this patch fail to attach with
+        /// <c>Parameter "pawns" not found in method ... CanSpawnOnWithExt</c>, which is only visible
+        /// with VOE actually installed. Renaming it here is the fix; do not "tidy" it back.</para>
+        /// </summary>
+        public static void VOE_CanSpawnOnWithExt_Postfix(object ext, PlanetTile tileIdx, System.Collections.Generic.IEnumerable<Pawn> ps, ref string __result)
         {
             if (!string.IsNullOrEmpty(__result)) return;
 
