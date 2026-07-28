@@ -1,6 +1,6 @@
 # Behaviour tests
 
-174 assertions that run without RimWorld, Unity, Harmony, or a game install.
+195 assertions that run without RimWorld, Unity, Harmony, or a game install.
 
 ```
 sudo apt-get install -y mono-mcs mono-runtime   # once, on WSL or Linux
@@ -26,6 +26,7 @@ rather than hunt constants through patch files.
 | `IntegrationTests` | world-object classification and the known-mod profile table |
 | `PlacementTests` | where a faction may and may not put a holding |
 | `ResourceTests` | resource pools, depletion, renewal, scanning and sustainable population |
+| `ResidencyTests` | who counts as living in a generated dwelling, migration off Core's comp, and publishing the answer back to Core |
 
 Sizing, production, taxation, military reach and standing moved to the **Factions** repo in 0.7
 along with their code, and their suites went with them — see `Factions/Tests`. What stayed here is

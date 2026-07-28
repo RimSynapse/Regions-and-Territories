@@ -28,9 +28,9 @@ namespace Outposts
     public class Outpost : RimWorld.Planet.WorldObject
     {
         public int level = 2;
-        private readonly List<RimWorld.Planet.Pawn> occupants = new List<RimWorld.Planet.Pawn>();
+        private readonly List<Verse.Pawn> occupants = new List<Verse.Pawn>();
         public int PawnCount { get { return occupants.Count; } }
-        public void AddOccupants(int n) { for (int i = 0; i < n; i++) occupants.Add(new RimWorld.Planet.Pawn()); }
+        public void AddOccupants(int n) { for (int i = 0; i < n; i++) occupants.Add(new Verse.Pawn()); }
     }
 
     public class Outpost_Farm : Outpost { }

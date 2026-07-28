@@ -51,6 +51,12 @@ run_suite resource \
     Tests/RimWorldStubs.cs Tests/ResourceTests.cs \
     $SRC/Integration/*.cs $SRC/Economy/*.cs
 
+# ResidencyInjector is not here: it is startup-only def surgery (StaticConstructorOnStartup over
+# DefDatabase) with no behaviour to assert away from a running game, like the map modes.
+run_suite residency \
+    Tests/RimWorldStubs.cs Tests/ResidencyStubs.cs Tests/ResidencyTests.cs \
+    $SRC/Residency/ResidentPawnComp.cs $SRC/Residency/ResidencyUtility.cs
+
 # Not a suite: a type-check over the impure files that cannot be behaviour-tested without a running
 # game, but whose signatures can still be held to the shapes they will really meet. This is what
 # catches a patch calling a method that no longer exists — the failure mode a mod cannot see until

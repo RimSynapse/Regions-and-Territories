@@ -436,12 +436,10 @@ namespace RimSynapse.RegionsAndTerritories
                 pawn.inventory.innerContainer.TryAdd(meals);
             }
 
-            // Set isResident = true in Core component
-            var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-            if (coreComp != null)
-            {
-                coreComp.isResident = true;
-            }
+            // This pawn lives here. Residency is this mod's own state as of 0.7 — it used to be a
+            // flag on Core's pawn comp, which meant generating a dwelling required Core to be
+            // installed.
+            Residency.ResidencyUtility.SetResident(pawn, true);
 
             GenSpawn.Spawn(pawn, spawnLoc, map);
 

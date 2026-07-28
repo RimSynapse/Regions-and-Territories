@@ -28,33 +28,81 @@ namespace RimSynapse.RegionsAndTerritories
             // so the patches below can classify through the registry instead of naming mod types.
             Integration.WorldObjectAdapterRegistry.Initialize();
 
-            TryRegisterPopulationDelegate();
+            RegisterProvidersWithCore();
             TryPatchEmpires(harmony);
             TryPatchVOE(harmony);
         }
 
-        private void TryRegisterPopulationDelegate()
+        /// <summary>
+        /// Publish the capabilities this mod owns to RimSynapse Core, if Core is installed.
+        ///
+        /// <para>All by reflection, and this mod holds no assembly reference to Core — it has to
+        /// build and run on its own, with nothing but Map Mode Framework. Every branch logs,
+        /// because a provider that quietly failed to register is indistinguishable from one
+        /// answering "nothing", which is the same failure class as an unbound Harmony patch.</para>
+        /// </summary>
+        private void RegisterProvidersWithCore()
+        {
+            var providers = GenTypes.GetTypeInAnyAssembly("RimSynapse.SynapseCoreProviders");
+            if (providers == null)
+            {
+                // Either Core is absent, or it predates the provider registry. Fall back so an
+                // older Core still gets population density.
+                TryRegisterLegacyPopulationDelegate();
+                return;
+            }
+
+            TryRegisterProvider(providers, "PopulationDensity",
+                (Func<int, int>)PopulationDensityUtility.GetPopulationAtTile);
+
+            Residency.ResidencyUtility.RegisterWithCore();
+        }
+
+        private void TryRegisterProvider(Type providers, string slotName, Delegate provider)
+        {
+            try
+            {
+                var slot = providers.GetProperty(slotName, BindingFlags.Public | BindingFlags.Static);
+                if (slot == null || !slot.CanWrite)
+                {
+                    Log.Warning($"[RimSynapse-RegionsAndTerritories] SynapseCoreProviders has no writable '{slotName}' slot; that capability will not be visible to other mods.");
+                    return;
+                }
+
+                slot.SetValue(null, provider);
+                Log.Message($"[RimSynapse-RegionsAndTerritories] Registered '{slotName}' provider to RimSynapse Core successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[RimSynapse-RegionsAndTerritories] Error registering '{slotName}' provider: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// The pre-registry registration path, for a copy of Core older than the provider surface.
+        /// Remove when that Core's shim field goes.
+        /// </summary>
+        private void TryRegisterLegacyPopulationDelegate()
         {
             try
             {
                 var coreWorldCompType = GenTypes.GetTypeInAnyAssembly("RimSynapse.SynapseCoreWorldComponent");
-                if (coreWorldCompType != null)
+                if (coreWorldCompType == null)
                 {
-                    var field = coreWorldCompType.GetField("GetPopulationDensityDelegate", BindingFlags.Public | BindingFlags.Static);
-                    if (field != null)
-                    {
-                        Func<int, int> del = PopulationDensityUtility.GetPopulationAtTile;
-                        field.SetValue(null, del);
-                        Log.Message("[RimSynapse-RegionsAndTerritories] Registered population delegate to RimSynapse Core successfully.");
-                    }
-                    else
-                    {
-                        Log.Warning("[RimSynapse-RegionsAndTerritories] Could not find GetPopulationDensityDelegate field in SynapseCoreWorldComponent.");
-                    }
+                    Log.Message("[RimSynapse-RegionsAndTerritories] RimSynapse Core not detected. Running standalone; no providers registered.");
+                    return;
+                }
+
+                var field = coreWorldCompType.GetField("GetPopulationDensityDelegate", BindingFlags.Public | BindingFlags.Static);
+                if (field != null)
+                {
+                    Func<int, int> del = PopulationDensityUtility.GetPopulationAtTile;
+                    field.SetValue(null, del);
+                    Log.Message("[RimSynapse-RegionsAndTerritories] Registered population delegate to RimSynapse Core (legacy field) successfully.");
                 }
                 else
                 {
-                    Log.Message("[RimSynapse-RegionsAndTerritories] RimSynapse Core not detected. Skipping population delegate registration.");
+                    Log.Warning("[RimSynapse-RegionsAndTerritories] Could not find GetPopulationDensityDelegate field in SynapseCoreWorldComponent.");
                 }
             }
             catch (Exception ex)

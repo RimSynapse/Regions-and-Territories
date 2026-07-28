@@ -15,6 +15,7 @@ namespace Verse
         public static void Warning(string s) { Captured.Add("WARN " + s); }
         public static void Error(string s) { Captured.Add("ERR  " + s); }
         public static void ErrorOnce(string s, int key) { Captured.Add("ERR  " + s); }
+        public static void WarningOnce(string s, int key) { Captured.Add("WARN " + s); }
     }
 
     public static class GenTypes
@@ -38,6 +39,10 @@ namespace Verse
     }
 
     public class ModSettings { public virtual void ExposeData() { } }
+
+    // The real Pawn is Verse.Pawn. It lived under RimWorld.Planet in these stubs until the
+    // residency suite needed the same type the source actually names.
+    public partial class Pawn { }
 
     // Partial so RimWorldStubsExt.cs can bolt on the wider surface (WorldGrid, World,
     // FactionManager, ...) needed to type-check the impure files, without the two behaviour
@@ -91,7 +96,6 @@ namespace RimWorld.Planet
 
     public class Settlement : WorldObject { }
     public class Site : WorldObject { }
-    public class Pawn { }
     public class Caravan : WorldObject
     {
         public List<Pawn> PawnsListForReading = new List<Pawn>();
