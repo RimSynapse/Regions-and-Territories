@@ -36,12 +36,15 @@ Official Wiki and Documentation: https://github.com/RimSynapse/Regions-and-Terri
 
 Handles mapping dynamics, including dynamic geographic province generation, world map overlays, regional faction territory control, population density mapping, road generation, and ruins placement.
 
-*** REQUIRES A NEW COLONY - NOT SAVE-GAME COMPATIBLE ***
-Install this before you generate a world, not partway through a playthrough.
+*** BEST ON A NEW COLONY - EXISTING SAVES ARE SUPPORTED IN COMPATIBILITY MODE ***
 
-Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. Added to a world that already exists, the provinces get drawn around settlements that were never placed by any of those rules - so territory ownership, occupancy, and border logic all report results that look broken, because the world they are describing never followed the rules they assume.
+Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. A world generated with the mod installed gets all of that.
 
-Removing it from an in-progress save will log errors about missing province data the next time that save is loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
+Added to a world that already exists, it adopts that world in Compatibility Mode instead. Provinces are still drawn, territory is still owned and shown on the map modes, and everything the overlays display works as normal. What stands down is placement: the mod will not decide where settlements and outposts may be built, because your world is already full of towns that were placed with no regard for those rules, and enforcing them now would refuse ground that has been settled since long before the mod arrived. Vanilla and any other mods keep control of placement, and more than one settlement may share a province.
+
+The mode is decided once, per save, and recorded in it. You can see and change it under Strict territorial ownership in the mod settings while that save is loaded - but be aware that switching an in-progress world to strict starts applying rules to settlements that were never placed under them.
+
+Removing the mod from an in-progress save will log errors about missing province data the next time that save is loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
 Requires: Map Mode Framework
 

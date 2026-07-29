@@ -216,7 +216,37 @@ namespace RimSynapse.RegionsAndTerritories
                 ref Integration.WorldObjectIntegrationSettings.settlementTiers, on,
                 "Classify settlements as village, town, city, or major city based on population.");
 
-            // Row 3 — diagnostics.
+            // Row 3 — territorial ownership mode.
+            y += 24f;
+            var manager = Find.World?.GetComponent<SynapseRegionManager>();
+            if (manager != null)
+            {
+                // A world is loaded, so edit that world's own flag rather than the default for new
+                // ones. Changing it mid-playthrough is legitimate but not free: the rules start or
+                // stop applying around settlements that were placed under the other regime.
+                bool strict = manager.StrictTerritorialOwnership;
+                bool before = strict;
+                Rect worldRect = new Rect(box.x + 10f, y, box.width - 20f, 22f);
+                Widgets.CheckboxLabeled(worldRect, "Strict territorial ownership (this world)", ref strict);
+                TooltipHandler.TipRegion(worldRect,
+                    "On: Regions & Territories decides where settlements and outposts may be built — buffers, supply range and footholds.\n\n" +
+                    "Off (compatibility): placement is left entirely to vanilla and other mods, and more than one settlement may share a province. " +
+                    "Regions are still generated and territory is still owned and drawn.\n\n" +
+                    "Worlds that existed before Regions & Territories was installed start in compatibility mode, because their settlements were " +
+                    "placed with no regard for these rules. Turning it on now will start refusing placements near towns that are already there.");
+                if (strict != before) manager.StrictTerritorialOwnership = strict;
+            }
+            else
+            {
+                Rect defRect = new Rect(box.x + 10f, y, box.width - 20f, 22f);
+                Widgets.CheckboxLabeled(defRect, "Strict territorial ownership (new worlds)",
+                    ref FactionPlacementSettings.strictTerritorialOwnershipDefault);
+                TooltipHandler.TipRegion(defRect,
+                    "Whether newly generated worlds enforce Regions & Territories' placement rules. " +
+                    "Worlds already in progress keep whatever mode they were adopted under; load a save to change that world's setting.");
+            }
+
+            // Row 4 — diagnostics.
             y += 24f;
             Rect logRect = new Rect(box.x + 10f, y, box.width - 20f, 22f);
             Widgets.CheckboxLabeled(logRect, "Log world object types no integration recognises",

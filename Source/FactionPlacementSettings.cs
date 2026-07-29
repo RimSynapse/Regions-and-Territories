@@ -54,6 +54,14 @@ namespace RimSynapse.RegionsAndTerritories
         public static float maxThreatPercent = 0.50f;
         public static float maxSettlementPercentOfRegions = 0.50f;
 
+        /// <summary>
+        /// Whether <b>newly generated</b> worlds enforce R&amp;T's settlement and outpost placement
+        /// rules. Worlds already in progress decide for themselves on load and are not affected by
+        /// this — a world built without the rules keeps compatibility mode, and one built with them
+        /// keeps strict. See <c>SynapseRegionManager.StrictTerritorialOwnership</c>.
+        /// </summary>
+        public static bool strictTerritorialOwnershipDefault = true;
+
         public override void ExposeData()
         {
             base.ExposeData();
@@ -61,6 +69,7 @@ namespace RimSynapse.RegionsAndTerritories
             Scribe_Values.Look(ref maxRegionSize, "maxRegionSize", 150);
             Scribe_Values.Look(ref maxThreatPercent, "maxThreatPercent", 0.50f);
             Scribe_Values.Look(ref maxSettlementPercentOfRegions, "maxSettlementPercentOfRegions", 0.50f);
+            Scribe_Values.Look(ref strictTerritorialOwnershipDefault, "strictTerritorialOwnershipDefault", true);
 
             // 0.7: world-object governance / mod-integration switches.
             Integration.WorldObjectIntegrationSettings.ExposeData();
