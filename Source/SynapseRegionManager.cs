@@ -132,6 +132,32 @@ namespace RimSynapse.RegionsAndTerritories
         /// added to, and its existing settlements were placed with no regard for our rules, so
         /// enforcing them now would refuse placements next to towns that already exist.</para>
         /// </summary>
+        /// <summary>
+        /// Test seam: the province list without the lazy generation the <see cref="Provinces"/>
+        /// getter performs. A case that needs to simulate "this save had no provinces" cannot use
+        /// the getter, because reading it is what builds them.
+        /// <para>Public rather than internal because the TestRunner is a separate assembly.</para>
+        /// </summary>
+        public List<GeographicProvince> ProvincesRaw
+        {
+            get { return provinces; }
+        }
+
+        /// <summary>
+        /// Test seam: put the flag back to unresolved so the load-time decision can be exercised.
+        /// Not part of normal operation — a live world has already decided.
+        /// </summary>
+        public void ResetStrictOwnershipForTesting()
+        {
+            strictTerritorialOwnershipRaw = -1;
+        }
+
+        /// <summary>Test seam: run the load-time decision directly, without a save round trip.</summary>
+        public void ResolveStrictOwnershipForTesting()
+        {
+            ResolveStrictOwnershipForLoadedSave();
+        }
+
         private void ResolveStrictOwnershipForLoadedSave()
         {
             if (strictTerritorialOwnershipRaw != -1) return;

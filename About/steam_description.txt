@@ -7,10 +7,14 @@
 
 ---
 
-[h2]⚠ Requires a New Colony - Not Save-Game Compatible[/h2]
-[b]Install this before you generate a world, not partway through a playthrough.[/b]
+[h2]Best on a New Colony - Existing Saves Supported in Compatibility Mode[/h2]
+[b]A world generated with the mod installed gets everything. A world already in progress is adopted in Compatibility Mode.[/b]
 
-Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion. Add it to a world that already exists and the provinces get drawn around settlements that were never placed by any of those rules - so territory ownership, occupancy, and border logic all report results that look broken, because the world they are describing never followed the rules they assume.
+Regions and Territories does most of its work during world generation. It draws the province boundaries and then places faction settlements according to them, respecting region occupancy limits, border buffers, and sequential expansion.
+
+Added to a world that already exists, it adopts that world in Compatibility Mode. Provinces are still drawn, territory is still owned and shown on the map modes, and the overlays work as normal. What stands down is placement: the mod will not decide where settlements and outposts may be built, because your world is already full of towns placed with no regard for those rules, and enforcing them now would refuse ground that has been settled since long before the mod arrived. Vanilla and any other mods keep control of placement, and more than one settlement may share a province.
+
+The mode is decided once per save and recorded in it. You can see and change it under [b]Strict territorial ownership[/b] in the mod settings while that save is loaded - though switching an in-progress world to strict starts applying rules to settlements that were never placed under them.
 
 Removing it from an in-progress save will log errors about missing province data when that save is next loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
@@ -84,7 +88,7 @@ These ship when they are ready - no dates.
 [*] [b]Anomaly DLC:[/b] Compatible
 [*] [b]Odyssey DLC:[/b] Fully Compatible and Optimized. Space factions are generated on the Orbit layer naturally, and terrestrial factions generate on the Surface layer.
 [*] [b]Map Mode Framework:[/b] Required for the map mode overlays.
-[*] [b]Existing saves:[/b] Not supported - Regions and Territories draws its provinces and places faction settlements during world generation, so it needs a new colony. Adding it partway through a playthrough will not work correctly.
+[*] [b]Existing saves:[/b] Supported in Compatibility Mode - provinces are generated and territory is drawn, but placement rules stand down and stay with vanilla or whichever mod owns them. A new colony still gets the full experience, including R&T-governed faction placement.
 [/list]
 
 ---
