@@ -16,6 +16,8 @@ Added to a world that already exists, it adopts that world in Compatibility Mode
 
 The mode is decided once per save and recorded in it. You can see and change it under [b]Strict territorial ownership[/b] in the mod settings while that save is loaded - though switching an in-progress world to strict starts applying rules to settlements that were never placed under them.
 
+[b]A new colony is still the recommended way to play.[/b] Compatibility mode exists so an existing save is usable, not so it is equivalent - geography-driven faction placement, region occupancy limits, border buffers and sequential expansion are the heart of what this mod does, and only a world generated with the mod installed gets them.
+
 Removing it from an in-progress save will log errors about missing province data when that save is next loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
 Regions and Territories divides the globe into dynamic geographic provinces with defined borders, population densities, custom road linkages, and procedurally placed ruins.
