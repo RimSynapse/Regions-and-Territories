@@ -34,12 +34,30 @@ namespace RimSynapse.RegionsAndTerritories
         public static PlacementDecision Evaluate(int tileId, Faction faction, WorldObjectKind kind)
         {
             if (!WorldObjectIntegrationSettings.PlacementGovernanceActive) return PlacementDecision.Allow();
+
+            // Compatibility mode: this world was built before R&T was installed, so it is already
+            // full of settlements our rules would have refused. Enforcing buffers and footholds now
+            // would block placements next to towns that have been there all along. Territory is
+            // still generated, owned and drawn — only the refusals stand down.
+            if (!StrictOwnershipActive()) return PlacementDecision.Allow();
+
             if (Find.WorldGrid == null || faction == null) return PlacementDecision.Allow();
 
             PlacementWorld world = BuildWorld();
             if (world == null) return PlacementDecision.Allow();
 
             return PlacementEvaluator.Evaluate(world, tileId, faction, kind);
+        }
+
+        /// <summary>
+        /// Whether this world enforces placement rules. Defaults to true when there is no world yet,
+        /// so a missing region manager cannot silently switch governance off — the compatibility
+        /// path has to be a decision recorded on a save, never an accident of load order.
+        /// </summary>
+        public static bool StrictOwnershipActive()
+        {
+            var manager = Find.World?.GetComponent<SynapseRegionManager>();
+            return manager == null || manager.StrictTerritorialOwnership;
         }
 
         /// <summary>

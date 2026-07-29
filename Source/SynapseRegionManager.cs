@@ -94,13 +94,69 @@ namespace RimSynapse.RegionsAndTerritories
             return GetProvince(pid);
         }
 
+        // -1 unresolved, 0 compatibility (non-strict), 1 strict. An int rather than a bool because
+        // "absent from this save" has to be distinguishable from "saved as false" — that
+        // distinction is the whole mechanism for adopting a save R&T was not present for.
+        private int strictTerritorialOwnershipRaw = -1;
+
+        /// <summary>
+        /// Whether this world enforces R&amp;T's placement rules for settlements and outposts.
+        ///
+        /// <para><b>Strict</b> (worlds generated with R&amp;T): buffers, supply, footholds and the
+        /// one-holding-per-province assumptions all apply, as they have since 0.7.</para>
+        ///
+        /// <para><b>Compatibility</b> (R&amp;T added to a world already in progress): placement is
+        /// left entirely to vanilla and to whatever other mods are doing it. Provinces are still
+        /// generated and territory is still owned and drawn — only the rules that would refuse a
+        /// placement stand down, because a world that was built without them is already full of
+        /// settlements those rules would have forbidden.</para>
+        /// </summary>
+        public bool StrictTerritorialOwnership
+        {
+            get { return strictTerritorialOwnershipRaw != 0; }
+            set { strictTerritorialOwnershipRaw = value ? 1 : 0; }
+        }
+
+        /// <summary>True once the mode has been decided for this world, either on load or at worldgen.</summary>
+        public bool StrictOwnershipResolved
+        {
+            get { return strictTerritorialOwnershipRaw != -1; }
+        }
+
+        /// <summary>
+        /// Decide the mode for a save that predates the flag.
+        ///
+        /// <para>The discriminator is <b>provinces, not the flag</b>. A save made with R&amp;T 0.7
+        /// also has no flag yet, but it does have generated provinces — that world was built under
+        /// the placement rules and must keep them. A save with neither is one R&amp;T has just been
+        /// added to, and its existing settlements were placed with no regard for our rules, so
+        /// enforcing them now would refuse placements next to towns that already exist.</para>
+        /// </summary>
+        private void ResolveStrictOwnershipForLoadedSave()
+        {
+            if (strictTerritorialOwnershipRaw != -1) return;
+
+            bool hadProvinces = provinces != null && provinces.Count > 0;
+            strictTerritorialOwnershipRaw = hadProvinces ? 1 : 0;
+
+            Log.Message(hadProvinces
+                ? "[RimSynapse-RegionsAndTerritories] Save predates the territorial-ownership flag but has generated provinces: treating as strict."
+                : "[RimSynapse-RegionsAndTerritories] Save has no province data: adopting it in compatibility mode. Regions will be generated; placement rules stand down.");
+        }
+
         public override void ExposeData()
         {
             base.ExposeData();
+            Scribe_Values.Look(ref strictTerritorialOwnershipRaw, "strictTerritorialOwnership", -1);
             Scribe_Collections.Look(ref provinces, "provinces", LookMode.Deep);
             if (provinces == null)
             {
                 provinces = new List<GeographicProvince>();
+            }
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                ResolveStrictOwnershipForLoadedSave();
             }
 
             Scribe_Collections.Look(ref settlementPlacementOrder, "settlementPlacementOrder", LookMode.Value, LookMode.Value);
@@ -161,6 +217,17 @@ namespace RimSynapse.RegionsAndTerritories
         public void GenerateProvinces()
         {
             Log.Message("[RimSynapse-RegionsAndTerritories] Generating Geographic Domains (Boundary-First Priority)...");
+
+            // A world generating provinces with the flag still unresolved is a brand new world:
+            // a loaded save resolves it in PostLoadInit, which runs before anything can reach the
+            // lazy Provinces getter. New worlds take the configured default, which is strict.
+            if (strictTerritorialOwnershipRaw == -1)
+            {
+                // Static on the settings class, like every other field there.
+                bool strict = FactionPlacementSettings.strictTerritorialOwnershipDefault;
+                strictTerritorialOwnershipRaw = strict ? 1 : 0;
+                Log.Message($"[RimSynapse-RegionsAndTerritories] New world: territorial ownership set to {(strict ? "strict" : "compatibility")}.");
+            }
 
             if (Find.WorldGrid == null) return;
             int totalTiles = Find.WorldGrid.TilesCount;
