@@ -16,6 +16,13 @@ namespace RimSynapse.RegionsAndTerritories
         public override void GameComponentUpdate()
         {
             if (triggered) return;
+
+            // Dev-only. This had no gate at all, so every player starting a game was yanked to the
+            // world map and had their map mode switched 300 ticks in — and, with Empire installed,
+            // had a foreign mod's destructive test suite run on them. None of that belongs in a
+            // shipped mod.
+            if (!Prefs.DevMode) { triggered = true; return; }
+
             if (Find.CurrentMap == null) return;
 
             // Wait until 300 ticks to ensure map is fully loaded
@@ -47,26 +54,19 @@ namespace RimSynapse.RegionsAndTerritories
                     Log.Error("[MapModeTestHelper] MapModeComponent.Instance is null!");
                 }
 
-                // Run Empires integration tests
-                var fcAssembly = System.AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == "Empire");
-                if (fcAssembly != null)
-                {
-                    Log.Warning("[MapModeTestHelper] Running FactionColonies unit/integration tests...");
-                    var runnerType = fcAssembly.GetType("FactionColonies.EmpireTestRunner");
-                    if (runnerType != null)
-                    {
-                        var runTestsMethod = runnerType.GetMethod("RunTests", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        if (runTestsMethod != null)
-                        {
-                            Log.Warning("[MapModeTestHelper] Running standard tests...");
-                            try { runTestsMethod.Invoke(null, new object[] { null, false }); } catch (System.Exception ex) { Log.Error("[MapModeTestHelper] Standard tests failed: " + ex); }
-                            
-                            Log.Warning("[MapModeTestHelper] Running destructive tests...");
-                            try { runTestsMethod.Invoke(null, new object[] { null, true }); } catch (System.Exception ex) { Log.Error("[MapModeTestHelper] Destructive tests failed: " + ex); }
-                        }
-                    }
-                }
+                // Empire's own test suite used to be invoked from here by reflection —
+                // EmpireTestRunner.RunTests(null, false) and then RunTests(null, true), the second
+                // being its *destructive* mode — synchronously, on the main thread, automatically.
+                //
+                // It did not return. The game was left burning a full core with Responding=false,
+                // which stops every GameComponentUpdate consumer: rendering, ticking, and the tool
+                // bridge's file poll. That is what made the in-game bridge look permanently broken
+                // (Repo-MCP#12) when its paths were correct all along.
+                //
+                // Running another mod's tests is not this mod's business, and running the mode its
+                // author labelled destructive is not something to do to a player's save. If Empire
+                // integration needs exercising, it belongs in our own TestRunner cases against our
+                // own patches. Do not reinstate this.
             }
         }
     }
