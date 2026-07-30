@@ -36,10 +36,28 @@ namespace RimSynapse.RegionsAndTerritories.Integration
                     "FactionColonies.FindFC",
                     "FactionColonies.WorldSettlementFC"
                 },
-                // SettlementFC exposes settlementLevel; the world object holds a reference to it.
-                populationMembers = new[] { "population", "Population", "settlementPopulation" },
-                levelMembers = new[] { "settlementLevel", "SettlementLevel", "level" },
-                maxLevelMembers = new[] { "maxSettlementLevel" },
+                // Empire has no concept called "population" — the three names previously listed here
+                // (population / Population / settlementPopulation) do not appear anywhere in its
+                // source, so TryGetPopulation returned false for every Empire settlement and every
+                // consumer read a plausible zero (#30).
+                //
+                // What it has is workers: a public double property on WorldSettlementFC, summed from
+                // the workers assigned to each ResourceFC. workersMax is the capacity for the same
+                // quantity. TryGetInt already narrows a double, so these read directly with no
+                // adapter change.
+                //
+                // Read against Empire Refactored 1.6.20, whose Workshop copy ships its source.
+                populationMembers = new[] { "workers", "workersMax" },
+                // settlementLevel is declared on WorldSettlementFC itself, not on a separate
+                // SettlementFC — there is no such type in Empire. The old comment describing one was
+                // the reason nobody questioned the population names beside it.
+                levelMembers = new[] { "settlementLevel" },
+                // maxSettlementLevel exists, but on WorldSettlementDef rather than on the world
+                // object, and the adapter only reads members of the instance's own type. The real
+                // ceiling is min(FCSettings.settlementMaxLevel, def.maxSettlementLevel) — per-def and
+                // player-configurable, so no single number is right for every settlement. 10 is the
+                // clamp Empire's own tests use and stays the assumed ceiling.
+                maxLevelMembers = new string[0],
                 assumedMaxLevel = 10,
                 // Empire runs the player's own colonies as WorldSettlementFC objects.
                 playerOwnedByDefault = true,
@@ -107,35 +125,69 @@ namespace RimSynapse.RegionsAndTerritories.Integration
         }
 
         /// <summary>
-        /// World Domination (LikewiseHH). It declares Vanilla Outposts Expanded as a dependency and
-        /// layers tiered, upgradeable faction bases on top of it, so most of its objects should
-        /// already resolve through the VOE adapter (priority 110 runs first).
+        /// World Domination 2.0 (TSA, packageId <c>TSA.WorldDominationExperimental</c>, assembly and
+        /// namespace <c>TSA_WorldDomination</c>).
         ///
-        /// This profile is deliberately heuristic: the exact namespace has not been pinned against a
-        /// live install yet. <see cref="WorldObjectClassifier"/> logs every world-object type it fails
-        /// to classify, so pinning it is a one-line change once the mod is loaded in a test run.
+        /// <para>Pinned against the installed mod. The previous version of this profile was written
+        /// without the mod present and was wrong in every particular — the namespace
+        /// (<c>WorldDomination.</c>), both marker types, the author, and the claim that it depends on
+        /// Vanilla Outposts Expanded. It declares Harmony and VFE Core only, so nothing of its
+        /// resolves through the VOE adapter and this profile carries the whole integration.</para>
+        ///
+        /// <para><b>The rule ordering is load-bearing.</b> Roughly half of this mod's world objects
+        /// are <c>WorldObject_Traveler</c> subclasses — raids, drop pods, road builders, expansion
+        /// and purchase parties. They move. The old namespace-prefix rule mapped every
+        /// <c>WorldDomination.*</c> type to <see cref="WorldObjectKind.Settlement"/>, which would have
+        /// made an in-flight raid a territory-holding settlement. Travelers are matched first and
+        /// classified as <see cref="WorldObjectKind.Caravan"/>, which is what they are.
+        /// <c>WorldObject_Traveler_Outpost_Delivery</c> contains both words; travelling to an outpost
+        /// is not being one.</para>
+        ///
+        /// <para><b>There is no level member, and that is a finding rather than a gap.</b> This mod
+        /// has two independent ladders and neither is a scalar on the world object. Settlement grade
+        /// is encoded in the def name (<c>TSA_Generic_T1_Farming</c> through
+        /// <c>TSA_Generic_T4_Citadel</c>), and upgrades are 34 separate purchases across lines each
+        /// carrying their own <c>lineTier</c> of 1-3. A single <c>assumedMaxLevel</c> cannot describe
+        /// that, so the level input stays at 0 — permanently unused for this mod, by observation.</para>
+        ///
+        /// <para>Its faction bases are vanilla <c>Settlement</c> objects with modded defs, so the
+        /// vanilla adapter already classifies them correctly; this profile covers only the types the
+        /// mod introduces.</para>
         /// </summary>
         public static WorldObjectAdapterProfile WorldDomination()
         {
             var p = new WorldObjectAdapterProfile
             {
                 adapterId = "worlddomination",
-                displayName = "World Domination",
+                displayName = "World Domination 2.0",
                 priority = 130,
                 markerTypes = new[]
                 {
-                    "WorldDomination.WorldDominationMod",
-                    "WorldDomination.WorldDominationSettings"
+                    "TSA_WorldDomination.WorldObject_WD_Outpost",
+                    "TSA_WorldDomination.WorldObject_Traveler"
                 },
-                populationMembers = new[] { "PawnCount", "population", "occupants", "garrison" },
-                levelMembers = new[] { "tier", "Tier", "level", "Level" },
+                // Pinned by Regions_AdapterProfilesMatchRealAssemblies against the installed mod:
+                // of the four candidates tried (pawnCount, PawnCount, occupants, garrison), these
+                // two resolve and the other two do not. The mod ships no source, so this was
+                // established by live reflection rather than by reading it.
+                //
+                // They are the same names Vanilla Outposts Expanded uses, which is worth knowing but
+                // not worth assuming a shared base class over: World Domination declares Harmony and
+                // VFE Core as its dependencies, not VOE. Treat the coincidence as a coincidence.
+                populationMembers = new[] { "PawnCount", "occupants" },
+                levelMembers = new string[0],
                 assumedMaxLevel = 0,
                 enabledGetter = () => WorldObjectIntegrationSettings.masterEnabled && WorldObjectIntegrationSettings.worldDominationEnabled
             };
 
-            p.Rule(TypeMatch.NamespacePrefix, "WorldDomination.", WorldObjectKind.Settlement)
-             .Rule(TypeMatch.TypeNameContains, "Garrison", WorldObjectKind.Military)
-             .Rule(TypeMatch.TypeNameContains, "Territory", WorldObjectKind.Settlement);
+            // Order matters: first match wins, and every Traveler_Outpost_* type would otherwise be
+            // caught by the outpost rules below.
+            p.Rule(TypeMatch.TypeNameContains, "Traveler", WorldObjectKind.Caravan)
+             .Rule(TypeMatch.ExactType, "TSA_WorldDomination.WorldObject_WD_Outpost", WorldObjectKind.Outpost)
+             .Rule(TypeMatch.TypeNameContains, "Outpost", WorldObjectKind.Outpost)
+             // Anything else this mod introduces later: an outpost is the safer default than a
+             // settlement, since outposts carry less territorial weight than settlements do.
+             .Rule(TypeMatch.NamespacePrefix, "TSA_WorldDomination.", WorldObjectKind.Outpost);
 
             return p;
         }
