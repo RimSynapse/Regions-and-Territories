@@ -150,12 +150,21 @@ namespace RimSynapse.RegionsAndTerritories
         public void ResetStrictOwnershipForTesting()
         {
             strictTerritorialOwnershipRaw = -1;
+
+            // A test that exercises the compat branch would otherwise arm the player notice and
+            // drop a letter into the live test colony on the next tick. Restore what we touch.
+            pendingCompatibilityNotice = false;
         }
 
         /// <summary>Test seam: run the load-time decision directly, without a save round trip.</summary>
         public void ResolveStrictOwnershipForTesting()
         {
             ResolveStrictOwnershipForLoadedSave();
+
+            // The compat branch arms a player-facing letter. Tests run inside a live colony, so
+            // leaving it armed would drop that letter on the next tick. The decision is what these
+            // cases exercise; the notice is deliberately not.
+            pendingCompatibilityNotice = false;
         }
 
         private void ResolveStrictOwnershipForLoadedSave()
@@ -168,6 +177,40 @@ namespace RimSynapse.RegionsAndTerritories
             Log.Message(hadProvinces
                 ? "[RimSynapse-RegionsAndTerritories] Save predates the territorial-ownership flag but has generated provinces: treating as strict."
                 : "[RimSynapse-RegionsAndTerritories] Save has no province data: adopting it in compatibility mode. Regions will be generated; placement rules stand down.");
+
+            // Tell the player, not just the log. Somebody who installs mid-playthrough gets a
+            // reduced mode and would otherwise have no way to know: the map modes look right, so
+            // nothing on screen says placement governance is off. Deferred rather than shown here
+            // because PostLoadInit runs before the UI is ready to take a letter.
+            if (!hadProvinces) pendingCompatibilityNotice = true;
+        }
+
+        /// <summary>Set when a save is adopted into compatibility mode; cleared once the player has been told.</summary>
+        private bool pendingCompatibilityNotice;
+
+        // WorldComponent has no FinalizeInit, so the notice rides the first tick instead. Ticks only
+        // run once the game is actually playing, which is exactly when the letter stack is ready.
+        public override void WorldComponentTick()
+        {
+            base.WorldComponentTick();
+
+            if (!pendingCompatibilityNotice) return;
+            pendingCompatibilityNotice = false;
+
+            Find.LetterStack?.ReceiveLetter(
+                "Regions and Territories: compatibility mode",
+                "This world was created before Regions and Territories was installed, so it has been adopted in " +
+                "compatibility mode.\n\n" +
+                "Provinces have been generated and territory ownership is drawn on the world map as normal. What is " +
+                "switched off is placement: the mod will not decide where settlements and outposts may be built. Your " +
+                "world is already full of settlements that were placed with no regard for those rules, and applying " +
+                "them now would refuse ground that has been settled since long before the mod arrived. Vanilla and " +
+                "your other mods keep control of placement, and more than one settlement may share a province.\n\n" +
+                "For the full experience — including faction placement governed by region occupancy, border buffers " +
+                "and sequential expansion — start a new colony with the mod already installed. That is what the mod " +
+                "is designed around; compatibility mode exists so an existing save is usable, not equivalent.\n\n" +
+                "You can review this under 'Strict territorial ownership' in the mod settings.",
+                LetterDefOf.NeutralEvent);
         }
 
         public override void ExposeData()

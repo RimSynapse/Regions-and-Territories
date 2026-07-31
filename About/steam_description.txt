@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.6.2 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.7.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Regions and Territories[/h1]
 [b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
@@ -15,6 +15,8 @@ Regions and Territories does most of its work during world generation. It draws 
 Added to a world that already exists, it adopts that world in Compatibility Mode. Provinces are still drawn, territory is still owned and shown on the map modes, and the overlays work as normal. What stands down is placement: the mod will not decide where settlements and outposts may be built, because your world is already full of towns placed with no regard for those rules, and enforcing them now would refuse ground that has been settled since long before the mod arrived. Vanilla and any other mods keep control of placement, and more than one settlement may share a province.
 
 The mode is decided once per save and recorded in it. You can see and change it under [b]Strict territorial ownership[/b] in the mod settings while that save is loaded - though switching an in-progress world to strict starts applying rules to settlements that were never placed under them.
+
+[b]A new colony is still the recommended way to play.[/b] Compatibility mode exists so an existing save is usable, not so it is equivalent - geography-driven faction placement, region occupancy limits, border buffers and sequential expansion are the heart of what this mod does, and only a world generated with the mod installed gets them.
 
 Removing it from an in-progress save will log errors about missing province data when that save is next loaded. The save will usually still open, but this is not a supported path and you should expect a wall of red text.
 
@@ -34,11 +36,25 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 [h2]Roadmap[/h2]
 [list]
 [*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Making the territory layer work cleanly alongside other major world and faction mods. A large undertaking on its own, and the groundwork everything faction-related depends on - the Factions work will build on the Empire mod.
-[*] [b]0.8 - Logic Externalization:[/b] Retiring hardcoded thresholds so the storyteller reasons about your colony's situation instead of following fixed rules.
-[*] [b]0.9 - Emergent Systems and Content:[/b] Faction archetypes for each DLC, caravans that travel the world map, settlement crises, faction capitals and travelling leaders, and richer colonist social dynamics.
+[*] [b]0.7 - Regions and Territories Compatibility:[/b] Basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
+[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
+[*] [b]0.9 - Factions and Living Societies:[/b] State ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
+[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Bringing every module back together for another pass over what the whole set can do.
 [/list]
 These ship when they are ready - no dates.
+
+---
+
+[h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
+[list]
+[*] NEW - Mod-agnostic world object integration: Empire Refactored, Vanilla Outposts Expanded, Vanilla Expanded Framework and World Domination are recognised through adapter profiles instead of by name, so territory rules no longer hardcode which mods exist.
+[*] NEW - Placement and territory governance: one evaluator decides where settlements, outposts, military installations and camps may stand, and the world inspect pane tells you why a tile was refused.
+[*] NEW - Compatibility mode: a world generated before this mod is adopted rather than refused, and you are told when that happens.
+[*] Fixed: Empire settlement population always read as zero. Three of the four adapter profiles named members or types that do not exist on the real assemblies, and nothing said so - a wrong name cost no error, it just returned a plausible zero.
+[*] Fixed: Vanilla Expanded Framework renamed its assembly from VFECore to VEF, so that profile had resolved to nothing for as long as it had existed.
+[*] Changed: the demographic component of territory ownership contributes nothing this release. It was awarding a fifth of the score for simply owning a settlement, which the settlement score already counted. It returns in 0.8 reading real regional demographics.
+[*] REQUIRES A NEW COLONY - not save-game compatible.
+[/list]
 
 ---
 
@@ -58,25 +74,7 @@ These ship when they are ready - no dates.
 [/list]
 
 ---
-[h2]Changelog (v0.6.0)[/h2]
-[list]
-[*] [b]Requires RimSynapse Core v0.6.0.[/b] This release moves in step with Core's Agent and Tool Foundation update - your saves and settings carry over unchanged.
-[*] [b]Documentation:[/b] In-game wiki guides updated; "MCP" renamed to game tools throughout, matching Core's native tool-calling engine.
-[/list]
-
----
-[h2]Changelog (v0.5.2)[/h2]
-[list]
-[*] [b]CHANGED - Quieter world generation:[/b] Diagnostic tracing dumped a full stack trace on every world generation, which was slow and looked like an error in the log. It now only logs in Developer Mode.
-[*] [b]Licence:[/b] Now PolyForm Noncommercial 1.0.0. Free to use, modify and share for any noncommercial purpose.
-[/list]
-
----
-
-[h2]Changelog (v0.5.1)[/h2]
-[list]
-[*] [b]NEW: Sea Ice Exclusion:[/b] Excludes Sea Ice tiles from regional size division, population density scoring, and procedural faction territory placement, keeping polar regions barren as intended.
-[/list]
+[b]Older releases:[/b] see the release notes at [url=https://github.com/RimSynapse/Regions-and-Territories/releases]github.com/RimSynapse/Regions-and-Territories[/url]
 
 ---
 

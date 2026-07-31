@@ -357,22 +357,35 @@ namespace RimSynapse.RegionsAndTerritories
             return groups.Count > 0 && groups[0].weight > 0f ? groups[0].faction : null;
         }
 
+        /// <summary>
+        /// Contributes nothing in 0.7, deliberately. Do not "fix" this back to a value.
+        ///
+        /// <para>This component is supposed to express what share of a region's people are a
+        /// given faction's. It never did. The provider path was real —
+        /// <see cref="RegionalDemographicRegistry"/> was consulted and Factions registers an
+        /// ideology provider into it — but underneath sat a fallback returning the full 20%
+        /// for merely owning a primary holding in the region, which <c>settlementScore</c>
+        /// already measures. The same fact was counted twice, the second time under a name
+        /// implying something else entirely.</para>
+        ///
+        /// <para>That fallback was not an edge case. It fired on every install where the
+        /// provider path yielded nothing — no providers registered, Ideology inactive, or a
+        /// provider returning a negative — which is most of them. It is **deleted** rather
+        /// than left dormant behind a zero, because a path that silently double-counts is
+        /// exactly what someone later switches back on while "fixing" an unexplained 0.</para>
+        ///
+        /// <para>The registry, provider registration and Factions' own provider are all left
+        /// wired, so 0.8 inherits a live surface rather than rebuilding one. 0.8 replaces this
+        /// with a read of the regional ideological distribution (Regions-and-Territories#34),
+        /// and Regions-and-Territories#44 makes the component's availability explicit so an
+        /// unavailable one leaves the denominator instead of quietly lowering every score.
+        /// Until then, ownership is scored only on what 0.7 actually models.</para>
+        ///
+        /// <para>Parameters are retained so the signature does not churn when 0.8 restores the
+        /// body.</para>
+        /// </summary>
         private static float CalculateDemographicScore(GeographicProvince province, Faction faction, List<WorldObject> primary)
         {
-            if (RegionalDemographicRegistry.HasProviders)
-            {
-                float demoMatch = RegionalDemographicRegistry.GetCombinedDemographicScore(province, faction);
-                if (demoMatch >= 0f)
-                {
-                    return 0.20f * demoMatch;
-                }
-            }
-
-            // Non-DLC fallback: if faction has a primary holding here, return full 20%
-            if (primary.Any(s => s.Faction == faction))
-            {
-                return 0.20f;
-            }
             return 0f;
         }
     }
