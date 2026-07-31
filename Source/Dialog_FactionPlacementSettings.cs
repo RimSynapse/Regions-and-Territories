@@ -233,7 +233,9 @@ namespace RimSynapse.RegionsAndTerritories
                     "Off (compatibility): placement is left entirely to vanilla and other mods, and more than one settlement may share a province. " +
                     "Regions are still generated and territory is still owned and drawn.\n\n" +
                     "Worlds that existed before Regions & Territories was installed start in compatibility mode, because their settlements were " +
-                    "placed with no regard for these rules. Turning it on now will start refusing placements near towns that are already there.");
+                    "placed with no regard for these rules. Turning it on now will start refusing placements near towns that are already there.\n\n" +
+                    "Compatibility mode exists so an existing save is usable, not so it is equivalent. For the full experience, start a new " +
+                    "colony with the mod already installed.");
                 if (strict != before) manager.StrictTerritorialOwnership = strict;
             }
             else
