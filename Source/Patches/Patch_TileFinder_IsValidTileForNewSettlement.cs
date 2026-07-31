@@ -23,7 +23,11 @@ namespace RimSynapse.RegionsAndTerritories.Patches
 
             // No player faction yet means we are still generating the world; faction bases are
             // placed by FactionPlacementUtility, which has its own rules.
-            Faction player = Faction.OfPlayer;
+            // OfPlayerSilentFail, not OfPlayer: this postfix runs during world gen (via
+            // WorldGenStep_AncientSites probing tiles), and Faction.OfPlayer logs
+            // "Could not find player faction." on every null return — 183 error-level lines per
+            // world gen, invisible until Repo-MCP#17 made Log.Error classifiable (R&T#46).
+            Faction player = Faction.OfPlayerSilentFail;
             if (player == null) return;
 
             // 0.7: all four rules — buffer, foreign territory, supply range, sequential expansion —
