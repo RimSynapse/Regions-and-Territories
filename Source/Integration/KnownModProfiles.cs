@@ -29,6 +29,7 @@ namespace RimSynapse.RegionsAndTerritories.Integration
             var p = new WorldObjectAdapterProfile
             {
                 adapterId = "empire",
+                packageId = "Matathias.Empire",
                 displayName = "Empire Refactored",
                 priority = 100,
                 markerTypes = new[]
@@ -80,6 +81,7 @@ namespace RimSynapse.RegionsAndTerritories.Integration
             var p = new WorldObjectAdapterProfile
             {
                 adapterId = "voe",
+                packageId = "vanillaexpanded.outposts",
                 displayName = "Vanilla Outposts Expanded",
                 priority = 110,
                 markerTypes = new[] { "Outposts.Outpost" },
@@ -96,30 +98,59 @@ namespace RimSynapse.RegionsAndTerritories.Integration
         }
 
         /// <summary>
-        /// Vanilla Factions Expanded family. VFE mods share the VFECore / VanillaFactionsExpanded
-        /// namespaces and add settlement-like and camp-like world objects.
+        /// Vanilla Expanded Framework (packageId <c>OskarPotocki.VanillaFactionsExpanded.Core</c>).
+        ///
+        /// <para><b>The assembly was renamed.</b> Under 1.6 this mod ships <c>VEF.dll</c> with
+        /// namespaces <c>VEF.Planet</c>, <c>VEF.Factions</c>, <c>VEF.Buildings</c> and so on. The
+        /// string <c>VFECore</c> does not occur anywhere in it. Every marker this profile previously
+        /// declared resolved to nothing, so the adapter was inert for as long as it has existed and
+        /// nothing said so (#31).</para>
+        ///
+        /// <para><b>It contributes exactly one world object of its own.</b> Enumerated from the live
+        /// assembly: <c>Outposts.Outpost</c>, <c>Outposts.Outpost_ChooseResult</c> and
+        /// <c>VEF.Planet.MovingBase</c>. The first two are Vanilla Outposts Expanded, which now ships
+        /// inside the framework and is already governed by the VOE profile at priority 110. So the
+        /// premise this profile was written on — that the framework adds settlement-like and
+        /// camp-like world objects — is simply not true of 1.6.</para>
+        ///
+        /// <para><b>Which is why the rules are now narrow, and that is the point of the change
+        /// rather than a detail of it.</b> The previous rules were four bare
+        /// <see cref="TypeMatch.TypeNameContains"/> matches on "Settlement", "Camp", "Outpost" and
+        /// "Base". Rules are not scoped to the declaring mod's assembly — <c>TryClassify</c> offers
+        /// every world object to every active adapter in priority order and takes the first
+        /// non-Unknown answer. At priority 120 this adapter runs before World Domination's 130, so
+        /// "Settlement" would have claimed <c>WorldObject_Traveler_SettlementBuy</c> and
+        /// <c>WorldObject_Traveler_SettlementGift</c> — moving purchase parties — as settlements
+        /// holding territory, and "Base" would have taken <c>MovingBase</c> as Military. Fixing the
+        /// marker names without narrowing the rules would have switched that on (see #33).</para>
+        ///
+        /// <para>A base that moves cannot hold a province stably, so <c>MovingBase</c> is a
+        /// <see cref="WorldObjectKind.Caravan"/> — the same judgement made for World Domination's
+        /// travelers, and what the vanilla adapter does with caravans.</para>
         /// </summary>
         public static WorldObjectAdapterProfile VanillaFactionsExpanded()
         {
             var p = new WorldObjectAdapterProfile
             {
                 adapterId = "vfe",
-                displayName = "Vanilla Factions Expanded",
+                packageId = "OskarPotocki.VanillaFactionsExpanded.Core",
+                displayName = "Vanilla Expanded Framework",
                 priority = 120,
-                markerTypes = new[]
-                {
-                    "VFECore.VFECore",
-                    "VFECore.SettlementDefExtension",
-                    "VanillaFactionsExpanded.VanillaFactionsExpandedMod"
-                },
-                populationMembers = new[] { "PawnCount", "population" },
+                markerTypes = new[] { "VEF.Planet.MovingBase" },
+                // Empty by observation, not by omission: neither PawnCount nor population exists on
+                // MovingBase, and it is the only world object this mod contributes. Declaring names
+                // that do not resolve is what left Empire reading zero for every settlement (#30);
+                // declaring none says "this mod publishes no headcount", which is true and is what
+                // the accessor's documented default already means.
+                populationMembers = new string[0],
                 enabledGetter = () => WorldObjectIntegrationSettings.masterEnabled && WorldObjectIntegrationSettings.vfeEnabled
             };
 
-            p.Rule(TypeMatch.TypeNameContains, "Settlement", WorldObjectKind.Settlement)
-             .Rule(TypeMatch.TypeNameContains, "Camp", WorldObjectKind.Camp)
-             .Rule(TypeMatch.TypeNameContains, "Outpost", WorldObjectKind.Outpost)
-             .Rule(TypeMatch.TypeNameContains, "Base", WorldObjectKind.Military);
+            // One rule, for the one type. No namespace fallback: VEF.Planet contains nothing else
+            // today, and a speculative rule for types that do not exist is exactly what this profile
+            // is being repaired for. WorldObjectClassifier logs anything it cannot classify, so a
+            // future VEF world object announces itself rather than being silently miscategorised.
+            p.Rule(TypeMatch.ExactType, "VEF.Planet.MovingBase", WorldObjectKind.Caravan);
 
             return p;
         }
@@ -159,6 +190,7 @@ namespace RimSynapse.RegionsAndTerritories.Integration
             var p = new WorldObjectAdapterProfile
             {
                 adapterId = "worlddomination",
+                packageId = "TSA.WorldDominationExperimental",
                 displayName = "World Domination 2.0",
                 priority = 130,
                 markerTypes = new[]
