@@ -1395,15 +1395,37 @@ namespace RimSynapse.RegionsAndTerritories
             if (!topologyBuilt) BuildProvinceTopology();
         }
 
+        private static readonly List<RimWorld.Planet.WorldObject> EmptyWorldObjects = new List<RimWorld.Planet.WorldObject>();
+
         public void RecalculateProvinceOwners()
         {
             if (Find.WorldObjects == null || provinces == null) return;
             EnsureTopology();
 
+            // Bucket every world object into its province in one pass (O(worldObjects)), so each
+            // province's ownership reads its own objects instead of filtering AllWorldObjects with a
+            // List.Contains over its tiles — which was O(worldObjects * tiles) per province (#48).
+            var objectsByProvince = new Dictionary<int, List<RimWorld.Planet.WorldObject>>();
+            foreach (var obj in Find.WorldObjects.AllWorldObjects)
+            {
+                if (obj == null) continue;
+                int opid = GetProvinceId(obj.Tile);
+                if (opid < 0) continue;
+                List<RimWorld.Planet.WorldObject> bucket;
+                if (!objectsByProvince.TryGetValue(opid, out bucket))
+                {
+                    bucket = new List<RimWorld.Planet.WorldObject>();
+                    objectsByProvince[opid] = bucket;
+                }
+                bucket.Add(obj);
+            }
+
             foreach (var province in provinces)
             {
                 province.owningFactionIds.Clear();
-                province.ownershipData = RegionalOwnershipUtility.CalculateOwnership(province);
+                List<RimWorld.Planet.WorldObject> regionObjects;
+                if (!objectsByProvince.TryGetValue(province.id, out regionObjects)) regionObjects = EmptyWorldObjects;
+                province.ownershipData = RegionalOwnershipUtility.CalculateOwnership(province, regionObjects);
 
                 if (province.ownershipData != null && province.ownershipData.factionScores != null)
                 {

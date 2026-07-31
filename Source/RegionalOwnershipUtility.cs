@@ -21,6 +21,20 @@ namespace RimSynapse.RegionsAndTerritories
         public float demographicScore;
 
         public float TotalScore => Mathf.Clamp01(settlementScore + perimeterCoverageScore + externalPerimeterScore + outpostCoverageScore + mostOutpostsScore + demographicScore);
+
+        /// <summary>
+        /// Rescale every component by the same factor. Used to normalise over the components that
+        /// are actually in play, so the displayed breakdown and the total stay consistent (#44).
+        /// </summary>
+        public void Scale(float factor)
+        {
+            settlementScore *= factor;
+            perimeterCoverageScore *= factor;
+            externalPerimeterScore *= factor;
+            outpostCoverageScore *= factor;
+            mostOutpostsScore *= factor;
+            demographicScore *= factor;
+        }
     }
 
     public class RegionalOwnershipData
@@ -106,14 +120,24 @@ namespace RimSynapse.RegionsAndTerritories
 
         public static RegionalOwnershipData CalculateOwnership(GeographicProvince province)
         {
+            // Fallback for callers without pre-bucketed objects (e.g. GetControl on one province).
+            // RecalculateProvinceOwners buckets every world object once, O(worldObjects), and calls
+            // the overload below — replacing the per-province AllWorldObjects.Where(tiles.Contains)
+            // scan that was O(worldObjects * tiles) summed across the map (#48).
+            List<WorldObject> regionObjects = (province?.tiles != null && Find.WorldObjects != null)
+                ? Find.WorldObjects.AllWorldObjects.Where(obj => province.tiles.Contains(obj.Tile)).ToList()
+                : new List<WorldObject>();
+            return CalculateOwnership(province, regionObjects);
+        }
+
+        public static RegionalOwnershipData CalculateOwnership(GeographicProvince province, List<WorldObject> regionObjects)
+        {
             var data = new RegionalOwnershipData { province = province };
             if (province == null || province.tiles == null || province.tiles.Count == 0 || Find.WorldGrid == null)
             {
                 return data;
             }
-
-            var allFactions = Find.FactionManager.AllFactionsListForReading;
-            var regionObjects = Find.WorldObjects.AllWorldObjects.Where(obj => province.tiles.Contains(obj.Tile)).ToList();
+            if (regionObjects == null) regionObjects = new List<WorldObject>();
 
             // 0.7: classification is mod-agnostic — see Integration.WorldObjectClassifier.
             // Primary holdings are the population centres and the forces stationed to hold them;
@@ -131,6 +155,24 @@ namespace RimSynapse.RegionsAndTerritories
             Dictionary<int, Faction> perimeterOwnerMap = MapPerimeterTileOwners(perimeterTiles, primary, secondary);
 
             CalculateFactionScores(data, candidateFactions, province, primary, secondary, perimeterTiles, perimeterOwnerMap);
+
+            // Normalise over the components actually in play. Each component's weight is only
+            // reachable when its input exists in the province, so with no outposts and no demographic
+            // providers a sole owner was capped at settlement + border = 0.50 (the "max claim is only
+            // 50%" bug). Rescaling by the in-play weight lets a sole owner approach 100% while
+            // preserving relative shares in a contested province. Demographics counts toward the
+            // denominator only once a provider is registered (#36), so it caps nothing until it
+            // actually exists — which is how the tooltip's Ideology line stays honest (#44).
+            float inPlayWeight = 0f;
+            if (primary.Count > 0) inPlayWeight += 0.20f;                              // settlements
+            if (perimeterOwnerMap.Values.Any(v => v != null)) inPlayWeight += 0.30f;   // borders
+            if (secondary.Count > 0) inPlayWeight += 0.30f;                            // outposts
+            if (RegionalDemographicRegistry.HasProviders) inPlayWeight += 0.20f;       // demographics
+            if (inPlayWeight > 0f && inPlayWeight < 1f)
+            {
+                float scale = 1f / inPlayWeight;
+                foreach (var s in data.factionScores) s.Scale(scale);
+            }
 
             float assignedTotal = data.factionScores.Sum(s => s.TotalScore);
             data.unclaimedScore = Mathf.Max(0f, 1f - assignedTotal);
