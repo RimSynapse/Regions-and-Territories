@@ -35,6 +35,16 @@ namespace RimSynapse.RegionsAndTerritories
         public RegionalOwnershipData ownershipData;
         public ProvinceType provinceType = ProvinceType.Land;
 
+        // --- Topology aggregate (#48) -------------------------------------------
+        // Derived purely from tile membership, so it is deliberately never scribed:
+        // SynapseRegionManager.BuildProvinceTopology fills it once (at generation, and lazily after
+        // load) and every perimeter/border query reads it instead of rescanning tiles. This is the
+        // "aggregate the region into one object and query it" model — the same one the resource
+        // pools below already follow.
+        public List<int> perimeterTiles;             // boundary tiles of this province
+        public Dictionary<int, int> borderShares;    // neighbour province id -> count of shared boundary edges
+        public int perimeterEdgeCount;               // total boundary edges, including edges to water / unassigned
+
         // --- Economics / Demographics ---
         public bool initializedEconomics;
 

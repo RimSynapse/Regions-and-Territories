@@ -710,6 +710,10 @@ namespace RimSynapse.RegionsAndTerritories
             Log.Message("[RimSynapse-RegionsAndTerritories] Running contextual province naming...");
             ResolveContextualNames();
 
+            // Aggregate the now-fixed topology once, so every later draw/ownership pass reads
+            // perimeters and border shares instead of rescanning tiles (#48).
+            BuildProvinceTopology();
+
             Log.Message($"[RimSynapse-RegionsAndTerritories] Generated {provinces.Count} Geographic Domains.");
         }
 
@@ -1331,9 +1335,70 @@ namespace RimSynapse.RegionsAndTerritories
             return baseName;
         }
 
+        private bool topologyBuilt;
+
+        /// <summary>
+        /// Precompute every province's perimeter tiles and per-neighbour border-edge counts in a
+        /// single pass over the world grid. Province topology is fixed once the provinces exist, so
+        /// this runs once — at generation, and rebuilt lazily after a load — and every later
+        /// perimeter/border query reads the aggregate instead of rescanning tiles. Replaces the
+        /// per-call flood-fill in <see cref="RegionalOwnershipUtility.GetPerimeterTiles"/> and gives
+        /// the border-share data the ownership scoring consumes.
+        /// </summary>
+        public void BuildProvinceTopology()
+        {
+            if (provinces == null || tileToProvinceId == null || Find.WorldGrid == null) return;
+
+            // Local id map: GetProvince is an O(provinces) scan, so calling it per tile would make
+            // this O(tiles * provinces).
+            var byId = new Dictionary<int, GeographicProvince>(provinces.Count);
+            foreach (var p in provinces)
+            {
+                p.perimeterTiles = new List<int>();
+                p.borderShares = new Dictionary<int, int>();
+                p.perimeterEdgeCount = 0;
+                byId[p.id] = p;
+            }
+
+            var neighbors = new List<RimWorld.Planet.PlanetTile>();
+            for (int t = 0; t < tileToProvinceId.Length; t++)
+            {
+                int pid = tileToProvinceId[t];
+                if (pid < 0) continue;
+                GeographicProvince prov;
+                if (!byId.TryGetValue(pid, out prov)) continue;
+
+                neighbors.Clear();
+                Find.WorldGrid.GetTileNeighbors(t, neighbors);
+                bool boundary = false;
+                foreach (var n in neighbors)
+                {
+                    int npid = tileToProvinceId[n.tileId];
+                    if (npid == pid) continue;      // interior edge
+                    boundary = true;
+                    prov.perimeterEdgeCount++;
+                    if (npid >= 0)                  // edge to another province; -1 = water/unassigned
+                    {
+                        int c;
+                        prov.borderShares.TryGetValue(npid, out c);
+                        prov.borderShares[npid] = c + 1;
+                    }
+                }
+                if (boundary) prov.perimeterTiles.Add(t);
+            }
+            topologyBuilt = true;
+        }
+
+        /// <summary>Build the topology aggregate once per session (covers both generation and load).</summary>
+        public void EnsureTopology()
+        {
+            if (!topologyBuilt) BuildProvinceTopology();
+        }
+
         public void RecalculateProvinceOwners()
         {
             if (Find.WorldObjects == null || provinces == null) return;
+            EnsureTopology();
 
             foreach (var province in provinces)
             {

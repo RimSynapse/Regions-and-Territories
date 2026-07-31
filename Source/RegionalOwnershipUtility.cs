@@ -232,6 +232,10 @@ namespace RimSynapse.RegionsAndTerritories
 
         public static HashSet<int> GetPerimeterTiles(GeographicProvince province)
         {
+            // Prefer the precomputed perimeter (SynapseRegionManager.BuildProvinceTopology). It is a
+            // pure function of tile membership, so rebuilding it per ownership pass was wasted work.
+            if (province.perimeterTiles != null) return new HashSet<int>(province.perimeterTiles);
+
             HashSet<int> provinceTileSet = new HashSet<int>(province.tiles);
             HashSet<int> perimeter = new HashSet<int>();
             WorldGrid grid = Find.WorldGrid;
