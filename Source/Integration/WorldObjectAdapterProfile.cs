@@ -54,6 +54,23 @@ namespace RimSynapse.RegionsAndTerritories.Integration
         /// </summary>
         public string[] markerTypes = new string[0];
 
+        /// <summary>
+        /// The mod this profile describes, as it appears in ModsConfig.xml. Optional, and used for
+        /// nothing at runtime — the adapter still activates on marker types alone, so a profile with
+        /// no packageId behaves exactly as before.
+        ///
+        /// <para>It exists so a test can tell the two silent states apart. "No marker resolved"
+        /// means the mod is absent, which is normal and correct; it also means the marker names are
+        /// wrong, which is a defect that looks identical from inside. Three of the four profiles
+        /// shipped with wrong markers before anything could distinguish them: Empire's population
+        /// names were invented (#30), World Domination's namespace was guessed, and Vanilla Expanded
+        /// Framework renamed its assembly from VFECore to VEF and this table never noticed (#31).</para>
+        ///
+        /// <para>With this set, a mod that is active while its markers resolve to nothing is a
+        /// failure rather than a shrug.</para>
+        /// </summary>
+        public string packageId;
+
         /// <summary>Evaluated in order; first match wins.</summary>
         public List<WorldObjectTypeRule> typeRules = new List<WorldObjectTypeRule>();
 

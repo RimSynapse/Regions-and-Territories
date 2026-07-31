@@ -130,7 +130,18 @@ namespace RimSynapse.RegionsAndTerritories.Integration
             return TryDefNameRules(obj, out kind);
         }
 
-        private WorldObjectKind EvaluateTypeRules(Type type)
+        /// <summary>
+        /// What this profile's type rules make of <paramref name="type"/>, ignoring def-name rules
+        /// and the cache.
+        ///
+        /// <para>Public so the suite can ask the question without an instance. Rules are not scoped
+        /// to the declaring mod — the registry offers every world object to every active adapter and
+        /// takes the first non-Unknown answer — so a rule can silently claim another mod's types
+        /// (#33). Detecting that needs the real matcher rather than a copy of it in the test, for
+        /// the same reason <c>SynapseLoadOrderCheck.FindViolations</c> is public: the check the game
+        /// performs and the check the suite performs must not be able to drift apart.</para>
+        /// </summary>
+        public WorldObjectKind EvaluateTypeRules(Type type)
         {
             var rules = profile.typeRules;
             if (rules == null) return WorldObjectKind.Unknown;
