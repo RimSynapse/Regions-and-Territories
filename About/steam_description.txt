@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.6.2 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.7.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Regions and Territories[/h1]
 [b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
@@ -45,6 +45,19 @@ These ship when they are ready - no dates.
 
 ---
 
+[h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
+[list]
+[*] NEW - Mod-agnostic world object integration: Empire Refactored, Vanilla Outposts Expanded, Vanilla Expanded Framework and World Domination are recognised through adapter profiles instead of by name, so territory rules no longer hardcode which mods exist.
+[*] NEW - Placement and territory governance: one evaluator decides where settlements, outposts, military installations and camps may stand, and the world inspect pane tells you why a tile was refused.
+[*] NEW - Compatibility mode: a world generated before this mod is adopted rather than refused, and you are told when that happens.
+[*] Fixed: Empire settlement population always read as zero. Three of the four adapter profiles named members or types that do not exist on the real assemblies, and nothing said so - a wrong name cost no error, it just returned a plausible zero.
+[*] Fixed: Vanilla Expanded Framework renamed its assembly from VFECore to VEF, so that profile had resolved to nothing for as long as it had existed.
+[*] Changed: the demographic component of territory ownership contributes nothing this release. It was awarding a fifth of the score for simply owning a settlement, which the settlement score already counted. It returns in 0.8 reading real regional demographics.
+[*] REQUIRES A NEW COLONY - not save-game compatible.
+[/list]
+
+---
+
 [h2]Changelog (v0.6.2)[/h2]
 [list]
 [*] [b]No gameplay changes.[/b] This release exists so the save-compatibility notice reaches people who already have the mod installed. Nothing in the mod behaves differently.
@@ -61,25 +74,7 @@ These ship when they are ready - no dates.
 [/list]
 
 ---
-[h2]Changelog (v0.6.0)[/h2]
-[list]
-[*] [b]Requires RimSynapse Core v0.6.0.[/b] This release moves in step with Core's Agent and Tool Foundation update - your saves and settings carry over unchanged.
-[*] [b]Documentation:[/b] In-game wiki guides updated; "MCP" renamed to game tools throughout, matching Core's native tool-calling engine.
-[/list]
-
----
-[h2]Changelog (v0.5.2)[/h2]
-[list]
-[*] [b]CHANGED - Quieter world generation:[/b] Diagnostic tracing dumped a full stack trace on every world generation, which was slow and looked like an error in the log. It now only logs in Developer Mode.
-[*] [b]Licence:[/b] Now PolyForm Noncommercial 1.0.0. Free to use, modify and share for any noncommercial purpose.
-[/list]
-
----
-
-[h2]Changelog (v0.5.1)[/h2]
-[list]
-[*] [b]NEW: Sea Ice Exclusion:[/b] Excludes Sea Ice tiles from regional size division, population density scoring, and procedural faction territory placement, keeping polar regions barren as intended.
-[/list]
+[b]Older releases:[/b] see the release notes at [url=https://github.com/RimSynapse/Regions-and-Territories/releases]github.com/RimSynapse/Regions-and-Territories[/url]
 
 ---
 

@@ -4,7 +4,7 @@
     <author>RimSynapse Team</author>
     <packageId>RimSynapse.RegionsAndTerritories</packageId>
     <url>https://github.com/RimSynapse/Regions-and-Territories</url>
-    <modVersion>0.6.2</modVersion>
+    <modVersion>0.7.0</modVersion>
     <supportedVersions>
         <li>1.5</li>
         <li>1.6</li>
@@ -29,7 +29,7 @@
     </loadAfter>
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
-Version: v0.6.2 (Target: RimWorld 1.6)
+Version: v0.7.0 (Target: RimWorld 1.6)
 
 RimSynapse - Regions and Territories
 Official Wiki and Documentation: https://github.com/RimSynapse/Regions-and-Territories/wiki
@@ -59,6 +59,14 @@ Requires: Map Mode Framework
 These ship when they are ready - no dates.
 
 --- Changelog ---
+v0.7.0 - Regions and Territories Compatibility
+- NEW - Mod-agnostic world object integration: Empire Refactored, Vanilla Outposts Expanded, Vanilla Expanded Framework and World Domination are recognised through adapter profiles instead of by name, so territory rules no longer hardcode which mods exist.
+- NEW - Placement and territory governance: one evaluator decides where settlements, outposts, military installations and camps may stand, and the world inspect pane tells you why a tile was refused.
+- NEW - Compatibility mode: a world generated before this mod is adopted rather than refused, and you are told when that happens.
+- Fixed: Empire settlement population always read as zero. Three of the four adapter profiles named members or types that do not exist on the real assemblies, and nothing said so - a wrong name cost no error, it just returned a plausible zero.
+- Fixed: Vanilla Expanded Framework renamed its assembly from VFECore to VEF, so that profile had resolved to nothing for as long as it had existed.
+- Changed: the demographic component of territory ownership contributes nothing this release. It was awarding a fifth of the score for simply owning a settlement, which the settlement score already counted. It returns in 0.8 reading real regional demographics.
+- REQUIRES A NEW COLONY - not save-game compatible.
 v0.6.2
 - No gameplay changes. This release exists so the save-compatibility notice reaches people who already have the mod installed.
 - Regions and Territories has always needed a new colony, and the Workshop page has said so - but the in-game description did not, so anyone who subscribed and never went back to the page had no way to find out.
