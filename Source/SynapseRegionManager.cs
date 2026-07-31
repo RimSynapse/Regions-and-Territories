@@ -1397,10 +1397,40 @@ namespace RimSynapse.RegionsAndTerritories
 
         private static readonly List<RimWorld.Planet.WorldObject> EmptyWorldObjects = new List<RimWorld.Planet.WorldObject>();
 
+        // Bumped whenever a territorial holding (settlement/outpost/military/camp) is added or
+        // removed — the only world-object changes that alter ownership. Static so it survives the
+        // fresh component a load creates and so the PostAdd/PostRemove patch can bump it without an
+        // instance. Population changes (which do not affect ownership) deliberately do not bump it.
+        private static int ownershipEpoch;
+        public static void BumpOwnershipEpoch() { ownershipEpoch++; }
+
+        private int ownersComputedVersion = -1;
+        private int ownersFactionCount = -1;
+
+        /// <summary>Force the next <see cref="RecalculateProvinceOwners"/> to recompute rather than
+        /// reuse the cache — for inputs the epoch/count gate does not observe (e.g. a demographic
+        /// provider registering, or a settlement changing faction without an add/remove).</summary>
+        public void MarkOwnersDirty()
+        {
+            ownersComputedVersion = -1;
+        }
+
         public void RecalculateProvinceOwners()
         {
             if (Find.WorldObjects == null || provinces == null) return;
             EnsureTopology();
+
+            // Ownership depends only on the territorial holdings present (add/remove bumps
+            // ownershipEpoch) and on which factions exist (defeat/creation changes the count). When
+            // neither has changed since the last pass the cached ownershipData/owningFactionIds are
+            // still valid, so the entire recompute — bucketing, perimeter owner mapping, scoring — is
+            // skipped. This is what turns "recompute on every draw" into "recompute only on change"
+            // (#48). MarkOwnersDirty covers the inputs this gate cannot see.
+            int epoch = ownershipEpoch;
+            int factionCount = Find.FactionManager?.AllFactionsListForReading?.Count ?? 0;
+            if (ownersComputedVersion == epoch && ownersFactionCount == factionCount) return;
+            ownersComputedVersion = epoch;
+            ownersFactionCount = factionCount;
 
             // Bucket every world object into its province in one pass (O(worldObjects)), so each
             // province's ownership reads its own objects instead of filtering AllWorldObjects with a
