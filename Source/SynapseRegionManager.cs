@@ -546,7 +546,9 @@ namespace RimSynapse.RegionsAndTerritories
                 }
                 else
                 {
-                    List<List<int>> subPockets = SplitChunkByVoronoi(landPocket);
+                    // Terrain-aware, size-bounded growth (#3): boundaries follow mountains/rivers,
+                    // regions stay under the cap, so no crude carve is needed afterwards.
+                    List<List<int>> subPockets = GrowTerrainBoundedRegions(landPocket, maxAllowed);
                     foreach (var pocket in subPockets)
                     {
                         if (pocket.Count == 0) continue;
@@ -895,6 +897,74 @@ namespace RimSynapse.RegionsAndTerritories
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Split a land pocket into size-bounded regions whose boundaries follow terrain (#3). Each
+        /// region grows from a seed via a cost-priority frontier — cheap across open land, expensive
+        /// across mountains and rivers — so it fills the open basin first and crosses rough terrain
+        /// last. Boundaries therefore fall along mountain ranges, and a narrow pass (expensive to
+        /// cross) becomes the divide between two regions. Growth stops at <paramref name="maxSize"/>,
+        /// so regions are inherently bounded and no post-hoc carve is required. Deterministic (seeds
+        /// from sorted tile ids) so a world regenerates identically.
+        /// </summary>
+        private List<List<int>> GrowTerrainBoundedRegions(List<int> chunk, int maxSize)
+        {
+            var remaining = new HashSet<int>(chunk);
+            var order = new List<int>(chunk);
+            order.Sort();
+            var result = new List<List<int>>();
+            var neighbors = new List<RimWorld.Planet.PlanetTile>();
+
+            foreach (int start in order)
+            {
+                if (!remaining.Contains(start)) continue;
+
+                var region = new List<int>();
+                var costs = new Dictionary<int, float>();
+                costs[start] = 0f;
+                var pq = new SimplePriorityQueue<int>();
+                pq.Enqueue(start, 0f);
+
+                while (pq.Count > 0 && region.Count < maxSize)
+                {
+                    int cur = pq.Dequeue();
+                    if (!remaining.Remove(cur)) continue;   // claimed already (stale queue entry)
+                    region.Add(cur);
+
+                    neighbors.Clear();
+                    Find.WorldGrid.GetTileNeighbors(cur, neighbors);
+                    foreach (var n in neighbors)
+                    {
+                        int nid = n.tileId;
+                        if (!remaining.Contains(nid)) continue;
+                        float nc = costs[cur] + TerrainStepCost(cur, nid);
+                        float existing;
+                        if (!costs.TryGetValue(nid, out existing) || nc < existing)
+                        {
+                            costs[nid] = nc;
+                            pq.Enqueue(nid, nc);
+                        }
+                    }
+                }
+                result.Add(region);
+            }
+            return result;
+        }
+
+        /// <summary>Cheap over open land, expensive across mountains and rivers, so a growing region
+        /// fills its basin before spilling over rough terrain — the mechanism that puts region
+        /// boundaries on natural barriers (#3).</summary>
+        private static float TerrainStepCost(int a, int b)
+        {
+            float cost = 1f;
+            Tile ta = Find.WorldGrid[a];
+            Tile tb = Find.WorldGrid[b];
+            bool rough = ta.hilliness == Hilliness.LargeHills || ta.hilliness == Hilliness.Mountainous
+                      || tb.hilliness == Hilliness.LargeHills || tb.hilliness == Hilliness.Mountainous;
+            if (rough) cost += 12f;
+            if (Find.WorldGrid.GetRiverDef(a, b) != null || Find.WorldGrid.GetRiverDef(b, a) != null) cost += 12f;
+            return cost;
         }
 
         private List<List<int>> SplitChunkByVoronoi(List<int> chunk)
