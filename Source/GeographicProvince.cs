@@ -44,6 +44,7 @@ namespace RimSynapse.RegionsAndTerritories
         public List<int> perimeterTiles;             // boundary tiles of this province
         public Dictionary<int, int> borderShares;    // neighbour province id -> count of shared boundary edges
         public int perimeterEdgeCount;               // total boundary edges, including edges to water / unassigned
+        public int naturalBorderEdges;               // edges against water / impassable mountains — secure frontiers for this region's own owner
 
         // --- Economics / Demographics ---
         public bool initializedEconomics;
@@ -181,6 +182,19 @@ namespace RimSynapse.RegionsAndTerritories
         {
             this.id = id;
         }
+
+        /// <summary>
+        /// A barren, low-productivity biome — desert, ice, extreme desert — where little grows and
+        /// animal life is hard to sustain. These lump into large unsplit regions and are weakly
+        /// contested no-man's-land, because nobody wants to settle them (#49).
+        /// </summary>
+        public static bool IsBarrenBiome(BiomeDef biome)
+        {
+            return biome != null && biome.plantDensity < 0.12f;
+        }
+
+        /// <summary>True when this region's dominant biome is barren no-man's-land.</summary>
+        public bool IsBarren => IsBarrenBiome(primaryBiome);
 
         public void ExposeData()
         {

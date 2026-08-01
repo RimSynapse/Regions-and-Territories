@@ -243,6 +243,21 @@ namespace RimSynapse.RegionsAndTerritories
                     }
                 }
             }
+            // Water / impassable-mountain frontiers count for this region's OWN owner, as if they
+            // bordered their own territory — a secure edge, not a contestable one. Only when the
+            // region actually has an owner; an unowned coast's water edges belong to no one (#44).
+            if (province.naturalBorderEdges > 0 && ownerByProvince != null)
+            {
+                Faction ownOwner;
+                if (ownerByProvince.TryGetValue(province.id, out ownOwner) && ownOwner != null)
+                {
+                    int e; edgesByFaction.TryGetValue(ownOwner, out e);
+                    edgesByFaction[ownOwner] = e + province.naturalBorderEdges;
+                    claimedEdges += province.naturalBorderEdges;
+                    totalEdges += province.naturalBorderEdges;
+                }
+            }
+
             data.claimedBorderEdges = claimedEdges;
             data.totalBorderEdges = totalEdges;
 
@@ -296,13 +311,18 @@ namespace RimSynapse.RegionsAndTerritories
                                + (outpostInPlay ? 0.30f : 0f) + (demoInPlay ? 0.20f : 0f);
             float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
 
+            // Barren no-man's-land: nobody truly holds a desert. Halve every claim so the region
+            // stays mostly unclaimed and no nation dominates it, however many outposts or borders
+            // touch it (#49). Combined with these regions being large, this leaves them contested-weak.
+            if (province != null && province.IsBarren) normScale *= 0.5f;
+
             if (FactionPlacementSettings.ShowCalculations)
             {
                 var dbg = new System.Text.StringBuilder();
                 dbg.AppendLine("--- ownership derivation ---");
                 dbg.AppendLine($"primary(settle/mil)={data.primaryCount}  secondary(outpost/camp)={data.secondaryCount}  borderEdges(claimed/total)={data.claimedBorderEdges}/{data.totalBorderEdges}");
                 dbg.AppendLine($"inPlay: settle={settleInPlay}  borders={bordersInPlay}  bonus={bonusInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
-                dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
+                dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}{(province != null && province.IsBarren ? "  [BARREN no-man's-land x0.5]" : "")}");
                 foreach (var s in data.factionScores)
                 {
                     int fEdges = 0;

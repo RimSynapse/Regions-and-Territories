@@ -446,6 +446,52 @@ namespace RimSynapse.RegionsAndTerritories
             int maxWithFeatures = baseMax + 30;
             int maxNoFeatures = baseMax + 10;
 
+            // Phase 2.5: Barren wastes (#49). Flood-fill contiguous low-productivity land (deserts,
+            // ice) into single large regions BEFORE the sized land-pocket split, and claim their
+            // tiles so that split skips them — nobody settles a desert, so it lumps together and
+            // (with EnforceMaxRegionSize exempting it) stays a large, weakly-contested no-man's-land.
+            // Tiny barren patches fall to MergeTinyDomains and rejoin their fertile neighbours.
+            {
+                var barrenNbrs = new List<RimWorld.Planet.PlanetTile>();
+                for (int i = 0; i < totalTiles; i++)
+                {
+                    if (tileToProvinceId[i] != -1) continue;
+                    Tile td = Find.WorldGrid[i];
+                    if (td.hilliness == Hilliness.Impassable || (td.PrimaryBiome != null && td.PrimaryBiome.impassable)) continue;
+                    if (!GeographicProvince.IsBarrenBiome(td.PrimaryBiome)) continue;
+
+                    var barren = new List<int>();
+                    var bq = new Queue<int>();
+                    bq.Enqueue(i);
+                    tileToProvinceId[i] = provinceIdCounter;
+                    while (bq.Count > 0)
+                    {
+                        int cur = bq.Dequeue();
+                        barren.Add(cur);
+                        barrenNbrs.Clear();
+                        Find.WorldGrid.GetTileNeighbors(cur, barrenNbrs);
+                        foreach (var n in barrenNbrs)
+                        {
+                            int nid = n.tileId;
+                            if (tileToProvinceId[nid] != -1) continue;
+                            Tile nd = Find.WorldGrid[nid];
+                            if (nd.hilliness == Hilliness.Impassable || (nd.PrimaryBiome != null && nd.PrimaryBiome.impassable)) continue;
+                            if (!GeographicProvince.IsBarrenBiome(nd.PrimaryBiome)) continue;
+                            tileToProvinceId[nid] = provinceIdCounter;
+                            bq.Enqueue(nid);
+                        }
+                    }
+
+                    var barrenDom = new GeographicProvince(provinceIdCounter);
+                    barrenDom.tiles = barren;
+                    barrenDom.provinceType = ProvinceType.Land;
+                    barrenDom.primaryBiome = GetPrimaryBiome(barren);
+                    barrenDom.name = GenerateProvinceName(provinceIdCounter, barrenDom.primaryBiome, barrenDom.provinceType);
+                    provinces.Add(barrenDom);
+                    provinceIdCounter++;
+                }
+            }
+
             for (int i = 0; i < totalTiles; i++)
             {
                 Tile tileData = Find.WorldGrid[i];
@@ -989,7 +1035,7 @@ namespace RimSynapse.RegionsAndTerritories
         {
             int hardCap = baseMax + 30;
             var oversized = provinces
-                .Where(p => p.provinceType == ProvinceType.Land && p.tiles != null && p.tiles.Count > hardCap)
+                .Where(p => p.provinceType == ProvinceType.Land && !p.IsBarren && p.tiles != null && p.tiles.Count > hardCap)
                 .ToList();
             if (oversized.Count == 0) return;
 
@@ -1446,6 +1492,7 @@ namespace RimSynapse.RegionsAndTerritories
                 p.perimeterTiles = new List<int>();
                 p.borderShares = new Dictionary<int, int>();
                 p.perimeterEdgeCount = 0;
+                p.naturalBorderEdges = 0;
                 byId[p.id] = p;
             }
 
@@ -1466,12 +1513,23 @@ namespace RimSynapse.RegionsAndTerritories
                     if (npid == pid) continue;      // interior edge
                     boundary = true;
                     prov.perimeterEdgeCount++;
-                    if (npid >= 0)                  // edge to another province; -1 = water/unassigned
+
+                    // A frontier against water or an impassable mountain is a secure natural border —
+                    // it counts for this region's own owner, not as a contestable land border (#44).
+                    Tile nt = Find.WorldGrid[n.tileId];
+                    bool naturalBarrier = nt.WaterCovered || nt.hilliness == Hilliness.Impassable
+                        || (nt.PrimaryBiome != null && nt.PrimaryBiome.impassable);
+                    if (naturalBarrier)
+                    {
+                        prov.naturalBorderEdges++;
+                    }
+                    else if (npid >= 0)             // contestable edge to another land province
                     {
                         int c;
                         prov.borderShares.TryGetValue(npid, out c);
                         prov.borderShares[npid] = c + 1;
                     }
+                    // else: unassigned non-natural land (rare) — not counted
                 }
                 if (boundary) prov.perimeterTiles.Add(t);
             }
