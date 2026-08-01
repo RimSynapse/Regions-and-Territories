@@ -525,47 +525,29 @@ namespace RimSynapse.RegionsAndTerritories
                 if (landPocket.Count == 0) continue;
 
                 bool hasFeatures = ChunkHasNaturalFeatures(landPocket);
-                int maxAllowed = hasFeatures ? maxWithFeatures : maxNoFeatures;
+                float pointCap = hasFeatures ? maxWithFeatures : maxNoFeatures;
 
-                // Decide and bound on TOTAL tiles, not usable: a coastal pocket with few usable tiles
-                // but a lot of water still needs bounding, or it stays oversized (#49/#3).
-                if (landPocket.Count <= maxAllowed)
+                // Always partition by terrain-aware, value-budgeted growth (#3/#49): the point cap is
+                // the size limit, so this single call does region design AND sizing together — no
+                // keep-whole special case and no post-hoc carve. Rich land yields compact regions,
+                // barren waste sprawls, water is absorbed for almost nothing.
+                List<List<int>> subPockets = GrowTerrainBoundedRegions(landPocket, pointCap);
+                foreach (var pocket in subPockets)
                 {
+                    if (pocket.Count == 0) continue;
+
                     GeographicProvince domain = new GeographicProvince(provinceIdCounter);
-                    domain.tiles = landPocket.ToList();
+                    domain.tiles = pocket.ToList();
                     domain.provinceType = ProvinceType.Land;
-                    domain.primaryBiome = GetPrimaryBiome(landPocket);
+                    domain.primaryBiome = GetPrimaryBiome(pocket);
                     domain.name = GenerateProvinceName(provinceIdCounter, domain.primaryBiome, domain.provinceType);
 
-                    foreach (int tileId in landPocket)
+                    foreach (int tileId in pocket)
                     {
                         tileToProvinceId[tileId] = provinceIdCounter;
                     }
                     provinces.Add(domain);
                     provinceIdCounter++;
-                }
-                else
-                {
-                    // Terrain-aware, size-bounded growth (#3): boundaries follow mountains/rivers,
-                    // regions stay under the cap, so no crude carve is needed afterwards.
-                    List<List<int>> subPockets = GrowTerrainBoundedRegions(landPocket, maxAllowed);
-                    foreach (var pocket in subPockets)
-                    {
-                        if (pocket.Count == 0) continue;
-
-                        GeographicProvince domain = new GeographicProvince(provinceIdCounter);
-                        domain.tiles = pocket.ToList();
-                        domain.provinceType = ProvinceType.Land;
-                        domain.primaryBiome = GetPrimaryBiome(pocket);
-                        domain.name = GenerateProvinceName(provinceIdCounter, domain.primaryBiome, domain.provinceType);
-
-                        foreach (int tileId in pocket)
-                        {
-                            tileToProvinceId[tileId] = provinceIdCounter;
-                        }
-                        provinces.Add(domain);
-                        provinceIdCounter++;
-                    }
                 }
             }
             // Phase 4.5: River Segmentation & Connection (Absorb rivers and small lakes into bordering Land/Ocean/Lake provinces)
@@ -754,10 +736,10 @@ namespace RimSynapse.RegionsAndTerritories
             MergeTinyDomains(minWithFeatures, minNoFeatures);
             Log.Message("[RimSynapse-RegionsAndTerritories] Finished MergeTinyDomains.");
 
-            // Phase 5b: hard size cap (#49). The Voronoi split can under-produce on barrier-heavy
-            // chunks (its cost-weighted partition lets one cell swallow the chunk), leaving regions
-            // far over the configured max. Guarantee the cap by re-carving any oversized region.
-            EnforceMaxRegionSize(baseMax);
+            // Phase 5b removed (#3/#49): the size cap is now enforced during growth by the value
+            // budget in GrowTerrainBoundedRegions, so there is no oversized region to re-carve and no
+            // crude carve to undo the terrain-following boundaries. EnforceMaxRegionSize is retained
+            // as a method for now but no longer called.
 
             // Naming Phase: Contextual Name Resolution
             Log.Message("[RimSynapse-RegionsAndTerritories] Running contextual province naming...");
@@ -908,7 +890,7 @@ namespace RimSynapse.RegionsAndTerritories
         /// so regions are inherently bounded and no post-hoc carve is required. Deterministic (seeds
         /// from sorted tile ids) so a world regenerates identically.
         /// </summary>
-        private List<List<int>> GrowTerrainBoundedRegions(List<int> chunk, int maxSize)
+        private List<List<int>> GrowTerrainBoundedRegions(List<int> chunk, float pointCap)
         {
             var remaining = new HashSet<int>(chunk);
             var order = new List<int>(chunk);
@@ -921,16 +903,22 @@ namespace RimSynapse.RegionsAndTerritories
                 if (!remaining.Contains(start)) continue;
 
                 var region = new List<int>();
+                float regionPoints = 0f;
                 var costs = new Dictionary<int, float>();
                 costs[start] = 0f;
                 var pq = new SimplePriorityQueue<int>();
                 pq.Enqueue(start, 0f);
 
-                while (pq.Count > 0 && region.Count < maxSize)
+                // Grow until the region has accumulated its VALUE budget, not a tile count: fertile /
+                // mineral-rich land fills the budget fast (compact regions), barren waste and water
+                // fill it slowly (sprawling regions). This one rule is the size cap AND the
+                // rich-compact / barren-sprawling character (#3/#49).
+                while (pq.Count > 0 && regionPoints < pointCap)
                 {
                     int cur = pq.Dequeue();
                     if (!remaining.Remove(cur)) continue;   // claimed already (stale queue entry)
                     region.Add(cur);
+                    regionPoints += TilePoints(cur);
 
                     neighbors.Clear();
                     Find.WorldGrid.GetTileNeighbors(cur, neighbors);
@@ -950,6 +938,30 @@ namespace RimSynapse.RegionsAndTerritories
                 result.Add(region);
             }
             return result;
+        }
+
+        /// <summary>
+        /// A tile's contribution to a region's size budget, in value points. Fertile and mineral-rich
+        /// land is worth more, so a region fills its budget in fewer tiles (compact); barren waste is
+        /// worth little, so regions there sprawl; water is near-free so it is absorbed without
+        /// spending the budget. The small floor keeps growth terminating even over zero-value water,
+        /// and makes region size a function of value rather than area (#49).
+        /// </summary>
+        private static float TilePoints(int tile)
+        {
+            Tile t = Find.WorldGrid[tile];
+            if (t.WaterCovered) return 0.05f;   // near-free: a coastal region absorbs its water for almost nothing
+            float value = 0f;
+            BiomeDef b = t.PrimaryBiome;
+            if (b != null) value += b.plantDensity + b.forageability;   // fertility / food
+            switch (t.hilliness)                                        // mineral potential
+            {
+                case Hilliness.SmallHills:  value += 0.25f; break;
+                case Hilliness.LargeHills:  value += 0.45f; break;
+                case Hilliness.Mountainous: value += 0.65f; break;
+                default:                    value += 0.10f; break;
+            }
+            return Mathf.Max(value, 0.05f);
         }
 
         /// <summary>Cheap over open land, expensive across mountains and rivers, so a growing region
