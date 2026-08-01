@@ -706,6 +706,11 @@ namespace RimSynapse.RegionsAndTerritories
             MergeTinyDomains(minWithFeatures, minNoFeatures);
             Log.Message("[RimSynapse-RegionsAndTerritories] Finished MergeTinyDomains.");
 
+            // Phase 5b: hard size cap (#49). The Voronoi split can under-produce on barrier-heavy
+            // chunks (its cost-weighted partition lets one cell swallow the chunk), leaving regions
+            // far over the configured max. Guarantee the cap by re-carving any oversized region.
+            EnforceMaxRegionSize(baseMax);
+
             // Naming Phase: Contextual Name Resolution
             Log.Message("[RimSynapse-RegionsAndTerritories] Running contextual province naming...");
             ResolveContextualNames();
@@ -972,6 +977,90 @@ namespace RimSynapse.RegionsAndTerritories
             }
 
             return groups.Values.ToList();
+        }
+
+        /// <summary>
+        /// Guarantees no land region exceeds the configured size (#49). Any region whose total tile
+        /// count is over the cap (plus the same slack the feature-rich split path allows) is re-carved
+        /// into connected, size-bounded pockets; the first stays as the region, the rest become new
+        /// ones. Only oversized regions are touched, so well-split regions keep their natural borders.
+        /// </summary>
+        private void EnforceMaxRegionSize(int baseMax)
+        {
+            int hardCap = baseMax + 30;
+            var oversized = provinces
+                .Where(p => p.provinceType == ProvinceType.Land && p.tiles != null && p.tiles.Count > hardCap)
+                .ToList();
+            if (oversized.Count == 0) return;
+
+            int nextId = provinces.Count > 0 ? provinces.Max(p => p.id) + 1 : 0;
+            int added = 0;
+
+            foreach (var big in oversized)
+            {
+                var pockets = CarveIntoSizedPockets(big.tiles, hardCap);
+                if (pockets.Count <= 1) continue;
+
+                big.tiles = pockets[0];
+                foreach (int t in big.tiles) tileToProvinceId[t] = big.id;
+
+                for (int i = 1; i < pockets.Count; i++)
+                {
+                    var np = new GeographicProvince(nextId++);
+                    np.tiles = pockets[i];
+                    np.provinceType = ProvinceType.Land;
+                    np.primaryBiome = GetPrimaryBiome(pockets[i]);
+                    np.name = GenerateProvinceName(np.id, np.primaryBiome, np.provinceType);
+                    foreach (int t in pockets[i]) tileToProvinceId[t] = np.id;
+                    provinces.Add(np);
+                    added++;
+                }
+            }
+
+            Log.Message($"[RimSynapse-RegionsAndTerritories] EnforceMaxRegionSize: re-carved {oversized.Count} oversized region(s) into {added} additional region(s) (cap {hardCap}).");
+        }
+
+        /// <summary>
+        /// Carve a tile set into connected pockets, each at most <paramref name="capTotal"/> tiles, by
+        /// repeated bounded breadth-first growth. Deterministic (starts from sorted tile ids) so a
+        /// world regenerates identically.
+        /// </summary>
+        private List<List<int>> CarveIntoSizedPockets(List<int> tiles, int capTotal)
+        {
+            var remaining = new HashSet<int>(tiles);
+            var order = new List<int>(tiles);
+            order.Sort();
+            var result = new List<List<int>>();
+            var neighbors = new List<RimWorld.Planet.PlanetTile>();
+
+            foreach (int startCandidate in order)
+            {
+                if (!remaining.Contains(startCandidate)) continue;
+
+                var pocket = new List<int>();
+                var queue = new Queue<int>();
+                queue.Enqueue(startCandidate);
+                remaining.Remove(startCandidate);
+
+                while (queue.Count > 0)
+                {
+                    int cur = queue.Dequeue();
+                    pocket.Add(cur);
+                    if (pocket.Count >= capTotal)
+                    {
+                        while (queue.Count > 0) remaining.Add(queue.Dequeue());   // return the frontier to the pool
+                        break;
+                    }
+                    neighbors.Clear();
+                    Find.WorldGrid.GetTileNeighbors(cur, neighbors);
+                    foreach (var n in neighbors)
+                    {
+                        if (remaining.Remove(n.tileId)) queue.Enqueue(n.tileId);
+                    }
+                }
+                result.Add(pocket);
+            }
+            return result;
         }
 
         private void MergeTinyDomains(int minWithFeatures, int minNoFeatures)
