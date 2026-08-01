@@ -446,11 +446,12 @@ namespace RimSynapse.RegionsAndTerritories
             int maxWithFeatures = baseMax + 30;
             int maxNoFeatures = baseMax + 10;
 
-            // Phase 2.5: Barren wastes (#49). Flood-fill contiguous low-productivity land (deserts,
-            // ice) into single large regions BEFORE the sized land-pocket split, and claim their
-            // tiles so that split skips them — nobody settles a desert, so it lumps together and
-            // (with EnforceMaxRegionSize exempting it) stays a large, weakly-contested no-man's-land.
-            // Tiny barren patches fall to MergeTinyDomains and rejoin their fertile neighbours.
+            // Phase 2.5: Water wastes. Flood-fill contiguous barren WATER (ocean, sea ice) into their
+            // own regions and claim their tiles so the land growth skips them — keeps open water out
+            // of land regions. Dry barren land (desert) is deliberately NOT claimed here: it flows
+            // into the value-budgeted, terrain-aware growth below, so a desert splits at its mountains
+            // and rivers, and its resource pockets seed regions rather than being stranded as
+            // enclaves (#3/#49).
             {
                 var barrenNbrs = new List<RimWorld.Planet.PlanetTile>();
                 for (int i = 0; i < totalTiles; i++)
@@ -458,7 +459,10 @@ namespace RimSynapse.RegionsAndTerritories
                     if (tileToProvinceId[i] != -1) continue;
                     Tile td = Find.WorldGrid[i];
                     if (td.hilliness == Hilliness.Impassable || (td.PrimaryBiome != null && td.PrimaryBiome.impassable)) continue;
-                    if (!GeographicProvince.IsBarrenBiome(td.PrimaryBiome)) continue;
+                    // Water wastes only (ocean, sea ice). Dry barren land (desert) now flows into the
+                    // value-budgeted, terrain-aware growth so it splits at mountains/rivers and its
+                    // resource pockets become region seeds instead of enclaves (#3/#49).
+                    if (!td.WaterCovered || !GeographicProvince.IsBarrenBiome(td.PrimaryBiome)) continue;
 
                     var barren = new List<int>();
                     var bq = new Queue<int>();
@@ -476,7 +480,7 @@ namespace RimSynapse.RegionsAndTerritories
                             if (tileToProvinceId[nid] != -1) continue;
                             Tile nd = Find.WorldGrid[nid];
                             if (nd.hilliness == Hilliness.Impassable || (nd.PrimaryBiome != null && nd.PrimaryBiome.impassable)) continue;
-                            if (!GeographicProvince.IsBarrenBiome(nd.PrimaryBiome)) continue;
+                            if (!nd.WaterCovered || !GeographicProvince.IsBarrenBiome(nd.PrimaryBiome)) continue;
                             tileToProvinceId[nid] = provinceIdCounter;
                             bq.Enqueue(nid);
                         }
@@ -484,7 +488,7 @@ namespace RimSynapse.RegionsAndTerritories
 
                     var barrenDom = new GeographicProvince(provinceIdCounter);
                     barrenDom.tiles = barren;
-                    barrenDom.provinceType = ProvinceType.Land;
+                    barrenDom.provinceType = ProvinceType.Ocean;
                     barrenDom.primaryBiome = GetPrimaryBiome(barren);
                     barrenDom.name = GenerateProvinceName(provinceIdCounter, barrenDom.primaryBiome, barrenDom.provinceType);
                     provinces.Add(barrenDom);
@@ -894,7 +898,14 @@ namespace RimSynapse.RegionsAndTerritories
         {
             var remaining = new HashSet<int>(chunk);
             var order = new List<int>(chunk);
-            order.Sort();
+            // Seed richest-first: a resource-rich tile anchors a region that grows out into the
+            // cheaper surrounding land (including desert), so valuable pockets become region CORES
+            // instead of stranded enclaves. Ties by id for deterministic regeneration (#3/#49).
+            order.Sort((x, y) =>
+            {
+                int c = TilePoints(y).CompareTo(TilePoints(x));
+                return c != 0 ? c : x.CompareTo(y);
+            });
             var result = new List<List<int>>();
             var neighbors = new List<RimWorld.Planet.PlanetTile>();
 
