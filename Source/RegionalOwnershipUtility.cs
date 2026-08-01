@@ -206,6 +206,7 @@ namespace RimSynapse.RegionsAndTerritories
         // perimeter-coverage (0.20) + external-perimeter (0.10) is gone with the tile-nearest-object
         // mapping it came from. perimeterCoverageScore carries it now; externalPerimeterScore stays 0.
         private const float BorderWeight = 0.30f;
+        private const float ExternalBonus = 0.10f;
 
         /// <summary>
         /// Pass 2: add border influence from neighbouring provinces, then normalize. A neighbour's
@@ -237,6 +238,8 @@ namespace RimSynapse.RegionsAndTerritories
             data.claimedBorderEdges = claimedEdges;
             data.totalBorderEdges = totalEdges;
 
+            Faction topBorderFaction = null;
+            int topBorderEdges = 0;
             if (claimedEdges > 0 && totalEdges > 0)
             {
                 foreach (var kv in edgesByFaction)
@@ -253,6 +256,16 @@ namespace RimSynapse.RegionsAndTerritories
                         data.factionScores.Add(entry);
                     }
                     entry.perimeterCoverageScore = borderScore;   // the neighbour-weighted border score
+
+                    if (kv.Value > topBorderEdges) { topBorderEdges = kv.Value; topBorderFaction = kv.Key; }
+                }
+
+                // Bonus to the faction holding the most of this region's border — the dominant
+                // neighbour, rewarded for surrounding it. Carried in externalPerimeterScore (#44).
+                if (topBorderFaction != null)
+                {
+                    var top = data.factionScores.FirstOrDefault(s => s.faction == topBorderFaction);
+                    if (top != null) top.externalPerimeterScore = ExternalBonus;
                 }
             }
 
@@ -267,10 +280,11 @@ namespace RimSynapse.RegionsAndTerritories
             // faction's score here — not merely because its input exists. A stub that scores nothing
             // (e.g. demographics before #36) must not dilute anyone (#44).
             bool settleInPlay  = data.factionScores.Any(s => s.settlementScore > 0f);
-            bool bordersInPlay = data.factionScores.Any(s => s.perimeterCoverageScore + s.externalPerimeterScore > 0f);
+            bool bordersInPlay = data.totalBorderEdges > 0;    // land neighbours exist -> border always counts, so an unsupported claim is genuinely weaker (#44 (1))
+            bool bonusInPlay   = data.claimedBorderEdges > 0;  // a dominant border neighbour exists to reward
             bool outpostInPlay = data.factionScores.Any(s => s.outpostCoverageScore + s.mostOutpostsScore > 0f);
             bool demoInPlay    = data.factionScores.Any(s => s.demographicScore > 0f);
-            float inPlayWeight = (settleInPlay ? 0.20f : 0f) + (bordersInPlay ? 0.30f : 0f)
+            float inPlayWeight = (settleInPlay ? 0.20f : 0f) + (bordersInPlay ? 0.30f : 0f) + (bonusInPlay ? 0.10f : 0f)
                                + (outpostInPlay ? 0.30f : 0f) + (demoInPlay ? 0.20f : 0f);
             float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
 
@@ -279,7 +293,7 @@ namespace RimSynapse.RegionsAndTerritories
                 var dbg = new System.Text.StringBuilder();
                 dbg.AppendLine("--- [DEV] raw ownership derivation ---");
                 dbg.AppendLine($"primary(settle/mil)={data.primaryCount}  secondary(outpost/camp)={data.secondaryCount}  borderEdges(claimed/total)={data.claimedBorderEdges}/{data.totalBorderEdges}");
-                dbg.AppendLine($"inPlay(contributed): settle={settleInPlay}  borders={bordersInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
+                dbg.AppendLine($"inPlay: settle={settleInPlay}  borders={bordersInPlay}  bonus={bonusInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
                 dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
                 foreach (var s in data.factionScores)
                 {

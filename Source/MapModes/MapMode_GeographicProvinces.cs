@@ -168,7 +168,7 @@ namespace RimSynapse.RegionsAndTerritories
                 sb.AppendLine("--- Regional Influence Breakdown ---");
                 foreach (var fs in data.factionScores)
                 {
-                    if (fs.TotalScore <= 0.001f) continue;
+                    if (fs.TotalScore < 0.01f) continue;   // hide negligible border grazes (a few edges)
                     string fname = fs.faction != null ? TextureUtility.GetFactionDisplayName(fs.faction) : "Unknown";
                     sb.AppendLine($"- {fname}: {fs.TotalScore:P0}");
                     sb.AppendLine($"  (Settlements: {fs.settlementScore:P0}, Borders: {fs.perimeterCoverageScore + fs.externalPerimeterScore:P0}, Outposts: {fs.outpostCoverageScore + fs.mostOutpostsScore:P0}, Ideology: {fs.demographicScore:P0})");
