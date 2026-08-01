@@ -43,6 +43,10 @@ namespace RimSynapse.RegionsAndTerritories
         public List<FactionOwnershipScore> factionScores = new List<FactionOwnershipScore>();
         public float unclaimedScore = 1f;
 
+        /// <summary>Dev-mode only: the raw pre-normalization derivation, shown in the tooltip so the
+        /// scoring can be tuned against ground truth rather than reverse-engineered.</summary>
+        public string debugBreakdown;
+
         public Faction PrimaryOwner => factionScores.OrderByDescending(s => s.TotalScore).FirstOrDefault(s => s.TotalScore > 0f)?.faction;
 
         /// <summary>This faction's share of the province, 0 if it has no presence at all.</summary>
@@ -168,10 +172,29 @@ namespace RimSynapse.RegionsAndTerritories
             if (perimeterOwnerMap.Values.Any(v => v != null)) inPlayWeight += 0.30f;   // borders
             if (secondary.Count > 0) inPlayWeight += 0.30f;                            // outposts
             if (RegionalDemographicRegistry.HasProviders) inPlayWeight += 0.20f;       // demographics
-            if (inPlayWeight > 0f && inPlayWeight < 1f)
+            float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
+
+            // Capture the raw derivation before scaling, so the dev tooltip shows exactly how each
+            // total was reached (which components were in play, the perimeter coverage, the scale).
+            if (Prefs.DevMode)
             {
-                float scale = 1f / inPlayWeight;
-                foreach (var s in data.factionScores) s.Scale(scale);
+                var dbg = new System.Text.StringBuilder();
+                dbg.AppendLine("--- [DEV] raw ownership derivation ---");
+                dbg.AppendLine($"primary(settle/mil)={primary.Count}  secondary(outpost/camp)={secondary.Count}  perimeterTiles={perimeterTiles.Count}");
+                dbg.AppendLine($"inPlay: settle={primary.Count > 0}  borders={perimeterOwnerMap.Values.Any(v => v != null)}  outposts={secondary.Count > 0}  demo={RegionalDemographicRegistry.HasProviders}");
+                dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
+                foreach (var s in data.factionScores)
+                {
+                    int fPerim = perimeterOwnerMap.Values.Count(v => v == s.faction);
+                    dbg.AppendLine($"  {s.faction?.Name}: rawTotal={s.TotalScore:0.000} -> norm={Mathf.Clamp01(s.TotalScore * normScale):0.000}");
+                    dbg.AppendLine($"     settle={s.settlementScore:0.000} perim={s.perimeterCoverageScore:0.000}({fPerim}/{perimeterTiles.Count}) ext={s.externalPerimeterScore:0.000} outpost={s.outpostCoverageScore:0.000} most={s.mostOutpostsScore:0.000} demo={s.demographicScore:0.000}");
+                }
+                data.debugBreakdown = dbg.ToString();
+            }
+
+            if (normScale != 1f)
+            {
+                foreach (var s in data.factionScores) s.Scale(normScale);
             }
 
             float assignedTotal = data.factionScores.Sum(s => s.TotalScore);

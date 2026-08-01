@@ -177,6 +177,12 @@ namespace RimSynapse.RegionsAndTerritories
                 {
                     sb.AppendLine($"- Unclaimed: {data.unclaimedScore:P0}");
                 }
+
+                if (Prefs.DevMode && !string.IsNullOrEmpty(data.debugBreakdown))
+                {
+                    sb.AppendLine();
+                    sb.Append(data.debugBreakdown);
+                }
             }
 
             sb.AppendLine();
