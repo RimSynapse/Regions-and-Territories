@@ -167,11 +167,17 @@ namespace RimSynapse.RegionsAndTerritories
             // preserving relative shares in a contested province. Demographics counts toward the
             // denominator only once a provider is registered (#36), so it caps nothing until it
             // actually exists — which is how the tooltip's Ideology line stays honest (#44).
-            float inPlayWeight = 0f;
-            if (primary.Count > 0) inPlayWeight += 0.20f;                              // settlements
-            if (perimeterOwnerMap.Values.Any(v => v != null)) inPlayWeight += 0.30f;   // borders
-            if (secondary.Count > 0) inPlayWeight += 0.30f;                            // outposts
-            if (RegionalDemographicRegistry.HasProviders) inPlayWeight += 0.20f;       // demographics
+            // A component's weight belongs in the denominator only if it actually contributed to
+            // some faction's score here — not merely because its input exists. Demographics
+            // registers a provider but scores 0 until #36, so gating "in play" on HasProviders alone
+            // diluted a sole owner (settle+borders 0.50 over a 0.70 denominator = 71%). Gate on real
+            // contribution: a stub component that scores nothing must not dilute anyone.
+            bool settleInPlay  = data.factionScores.Any(s => s.settlementScore > 0f);
+            bool bordersInPlay = data.factionScores.Any(s => s.perimeterCoverageScore + s.externalPerimeterScore > 0f);
+            bool outpostInPlay = data.factionScores.Any(s => s.outpostCoverageScore + s.mostOutpostsScore > 0f);
+            bool demoInPlay    = data.factionScores.Any(s => s.demographicScore > 0f);
+            float inPlayWeight = (settleInPlay ? 0.20f : 0f) + (bordersInPlay ? 0.30f : 0f)
+                               + (outpostInPlay ? 0.30f : 0f) + (demoInPlay ? 0.20f : 0f);
             float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
 
             // Capture the raw derivation before scaling, so the dev tooltip shows exactly how each
@@ -181,7 +187,7 @@ namespace RimSynapse.RegionsAndTerritories
                 var dbg = new System.Text.StringBuilder();
                 dbg.AppendLine("--- [DEV] raw ownership derivation ---");
                 dbg.AppendLine($"primary(settle/mil)={primary.Count}  secondary(outpost/camp)={secondary.Count}  perimeterTiles={perimeterTiles.Count}");
-                dbg.AppendLine($"inPlay: settle={primary.Count > 0}  borders={perimeterOwnerMap.Values.Any(v => v != null)}  outposts={secondary.Count > 0}  demo={RegionalDemographicRegistry.HasProviders}");
+                dbg.AppendLine($"inPlay(contributed): settle={settleInPlay}  borders={bordersInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
                 dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
                 foreach (var s in data.factionScores)
                 {
