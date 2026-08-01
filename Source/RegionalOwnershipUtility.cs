@@ -47,6 +47,12 @@ namespace RimSynapse.RegionsAndTerritories
         /// scoring can be tuned against ground truth rather than reverse-engineered.</summary>
         public string debugBreakdown;
 
+        // Diagnostics captured during scoring, for the dev derivation block.
+        public int primaryCount;
+        public int secondaryCount;
+        public int claimedBorderEdges;
+        public int totalBorderEdges;
+
         public Faction PrimaryOwner => factionScores.OrderByDescending(s => s.TotalScore).FirstOrDefault(s => s.TotalScore > 0f)?.faction;
 
         /// <summary>This faction's share of the province, 0 if it has no presence at all.</summary>
@@ -136,6 +142,21 @@ namespace RimSynapse.RegionsAndTerritories
 
         public static RegionalOwnershipData CalculateOwnership(GeographicProvince province, List<WorldObject> regionObjects)
         {
+            // Single-province fallback (e.g. GetControl with no cached data): base scores + normalize,
+            // WITHOUT border influence — that needs the neighbour owners the two-pass
+            // RecalculateProvinceOwners supplies. The cached ownershipData it writes DOES include borders.
+            var data = CalculateOwnershipBase(province, regionObjects);
+            NormalizeAndCapture(data, province, null);
+            return data;
+        }
+
+        /// <summary>
+        /// Pass 1: a province's ownership from its own holdings only — settlements, outposts,
+        /// demographics — with no border influence and no normalization. The dominant owner of this
+        /// is what neighbouring provinces read when computing their border scores.
+        /// </summary>
+        public static RegionalOwnershipData CalculateOwnershipBase(GeographicProvince province, List<WorldObject> regionObjects)
+        {
             var data = new RegionalOwnershipData { province = province };
             if (province == null || province.tiles == null || province.tiles.Count == 0 || Find.WorldGrid == null)
             {
@@ -148,30 +169,103 @@ namespace RimSynapse.RegionsAndTerritories
             // secondary holdings are the production and forward positions that support them.
             var primary = regionObjects.Where(o => IsKind(o, WorldObjectKind.Settlement, WorldObjectKind.Military)).ToList();
             var secondary = regionObjects.Where(o => IsKind(o, WorldObjectKind.Outpost, WorldObjectKind.Camp)).ToList();
+            data.primaryCount = primary.Count;
+            data.secondaryCount = secondary.Count;
 
             HashSet<Faction> candidateFactions = GetCandidateFactions(primary, secondary);
-            if (candidateFactions.Count == 0)
+            if (candidateFactions.Count == 0) return data;   // no holdings: only neighbours' borders can claim it
+
+            Faction maxSecondaryOwner = GetMaxSecondaryHoldingOwner(secondary);
+            float primaryTotal = WeightedTotal(primary);
+            float secondaryTotal = WeightedTotal(secondary);
+
+            foreach (Faction f in candidateFactions)
             {
-                return data;
+                var score = new FactionOwnershipScore { faction = f };
+                if (primaryTotal > 0f)  score.settlementScore = 0.20f * (WeightedTotalFor(primary, f) / primaryTotal);
+                if (secondaryTotal > 0f) score.outpostCoverageScore = 0.20f * (WeightedTotalFor(secondary, f) / secondaryTotal);
+                if (maxSecondaryOwner != null && f == maxSecondaryOwner) score.mostOutpostsScore = 0.10f;
+                score.demographicScore = CalculateDemographicScore(province, f, primary);
+                data.factionScores.Add(score);
+            }
+            return data;
+        }
+
+        /// <summary>The strongest holder of a province by its own holdings (pass-1 base score), or
+        /// null if nobody clears a small floor. Neighbours read this for their border scores.</summary>
+        public static Faction DominantBaseOwner(RegionalOwnershipData data)
+        {
+            if (data == null) return null;
+            FactionOwnershipScore best = null;
+            foreach (var s in data.factionScores)
+                if (s.faction != null && (best == null || s.TotalScore > best.TotalScore)) best = s;
+            return (best != null && best.TotalScore > 0.05f) ? best.faction : null;
+        }
+
+        // Border is a single 0.30 component, distributed by neighbour ownership; the old split of
+        // perimeter-coverage (0.20) + external-perimeter (0.10) is gone with the tile-nearest-object
+        // mapping it came from. perimeterCoverageScore carries it now; externalPerimeterScore stays 0.
+        private const float BorderWeight = 0.30f;
+
+        /// <summary>
+        /// Pass 2: add border influence from neighbouring provinces, then normalize. A neighbour's
+        /// owner claims this province's shared border in proportion to the shared hex-edge count
+        /// (precomputed and static in <see cref="GeographicProvince.borderShares"/>). Unclaimed
+        /// neighbours contribute nothing; with no claimed neighbour, borders score 0 for everyone.
+        /// Because the geometry is static, a neighbour changing owner is a cheap recompute (#44).
+        /// </summary>
+        public static void ApplyBordersAndNormalize(RegionalOwnershipData data, GeographicProvince province, Dictionary<int, Faction> ownerByProvince)
+        {
+            if (data == null || province == null) return;
+
+            var edgesByFaction = new Dictionary<Faction, int>();
+            int claimedEdges = 0, totalEdges = 0;
+            if (province.borderShares != null)
+            {
+                foreach (var kv in province.borderShares)
+                {
+                    totalEdges += kv.Value;
+                    Faction owner;
+                    if (ownerByProvince != null && ownerByProvince.TryGetValue(kv.Key, out owner) && owner != null)
+                    {
+                        int e; edgesByFaction.TryGetValue(owner, out e);
+                        edgesByFaction[owner] = e + kv.Value;
+                        claimedEdges += kv.Value;
+                    }
+                }
+            }
+            data.claimedBorderEdges = claimedEdges;
+            data.totalBorderEdges = totalEdges;
+
+            if (claimedEdges > 0 && totalEdges > 0)
+            {
+                foreach (var kv in edgesByFaction)
+                {
+                    // Divide by TOTAL land-neighbour edges, not claimed: 80% of the border being one
+                    // faction earns it 80% of the border weight, and the unclaimed remainder stays a
+                    // wild frontier rather than being handed to the lone claimant (#44). Water / map
+                    // edges are already excluded — borderShares only holds edges to other provinces.
+                    float borderScore = BorderWeight * ((float)kv.Value / totalEdges);
+                    var entry = data.factionScores.FirstOrDefault(s => s.faction == kv.Key);
+                    if (entry == null)
+                    {
+                        entry = new FactionOwnershipScore { faction = kv.Key };  // a neighbour with no holding here still borders it
+                        data.factionScores.Add(entry);
+                    }
+                    entry.perimeterCoverageScore = borderScore;   // the neighbour-weighted border score
+                }
             }
 
-            HashSet<int> perimeterTiles = GetPerimeterTiles(province);
-            Dictionary<int, Faction> perimeterOwnerMap = MapPerimeterTileOwners(perimeterTiles, primary, secondary);
+            NormalizeAndCapture(data, province, edgesByFaction);
+        }
 
-            CalculateFactionScores(data, candidateFactions, province, primary, secondary, perimeterTiles, perimeterOwnerMap);
+        private static void NormalizeAndCapture(RegionalOwnershipData data, GeographicProvince province, Dictionary<Faction, int> borderEdgesByFaction)
+        {
+            if (data == null) return;
 
-            // Normalise over the components actually in play. Each component's weight is only
-            // reachable when its input exists in the province, so with no outposts and no demographic
-            // providers a sole owner was capped at settlement + border = 0.50 (the "max claim is only
-            // 50%" bug). Rescaling by the in-play weight lets a sole owner approach 100% while
-            // preserving relative shares in a contested province. Demographics counts toward the
-            // denominator only once a provider is registered (#36), so it caps nothing until it
-            // actually exists — which is how the tooltip's Ideology line stays honest (#44).
-            // A component's weight belongs in the denominator only if it actually contributed to
-            // some faction's score here — not merely because its input exists. Demographics
-            // registers a provider but scores 0 until #36, so gating "in play" on HasProviders alone
-            // diluted a sole owner (settle+borders 0.50 over a 0.70 denominator = 71%). Gate on real
-            // contribution: a stub component that scores nothing must not dilute anyone.
+            // A component's weight belongs in the denominator only if it actually contributed to some
+            // faction's score here — not merely because its input exists. A stub that scores nothing
+            // (e.g. demographics before #36) must not dilute anyone (#44).
             bool settleInPlay  = data.factionScores.Any(s => s.settlementScore > 0f);
             bool bordersInPlay = data.factionScores.Any(s => s.perimeterCoverageScore + s.externalPerimeterScore > 0f);
             bool outpostInPlay = data.factionScores.Any(s => s.outpostCoverageScore + s.mostOutpostsScore > 0f);
@@ -180,20 +274,19 @@ namespace RimSynapse.RegionsAndTerritories
                                + (outpostInPlay ? 0.30f : 0f) + (demoInPlay ? 0.20f : 0f);
             float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
 
-            // Capture the raw derivation before scaling, so the dev tooltip shows exactly how each
-            // total was reached (which components were in play, the perimeter coverage, the scale).
             if (Prefs.DevMode)
             {
                 var dbg = new System.Text.StringBuilder();
                 dbg.AppendLine("--- [DEV] raw ownership derivation ---");
-                dbg.AppendLine($"primary(settle/mil)={primary.Count}  secondary(outpost/camp)={secondary.Count}  perimeterTiles={perimeterTiles.Count}");
+                dbg.AppendLine($"primary(settle/mil)={data.primaryCount}  secondary(outpost/camp)={data.secondaryCount}  borderEdges(claimed/total)={data.claimedBorderEdges}/{data.totalBorderEdges}");
                 dbg.AppendLine($"inPlay(contributed): settle={settleInPlay}  borders={bordersInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
                 dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
                 foreach (var s in data.factionScores)
                 {
-                    int fPerim = perimeterOwnerMap.Values.Count(v => v == s.faction);
+                    int fEdges = 0;
+                    if (borderEdgesByFaction != null) borderEdgesByFaction.TryGetValue(s.faction, out fEdges);
                     dbg.AppendLine($"  {s.faction?.Name}: rawTotal={s.TotalScore:0.000} -> norm={Mathf.Clamp01(s.TotalScore * normScale):0.000}");
-                    dbg.AppendLine($"     settle={s.settlementScore:0.000} perim={s.perimeterCoverageScore:0.000}({fPerim}/{perimeterTiles.Count}) ext={s.externalPerimeterScore:0.000} outpost={s.outpostCoverageScore:0.000} most={s.mostOutpostsScore:0.000} demo={s.demographicScore:0.000}");
+                    dbg.AppendLine($"     settle={s.settlementScore:0.000} border={s.perimeterCoverageScore:0.000}({fEdges}/{data.totalBorderEdges} edges) outpost={s.outpostCoverageScore:0.000} most={s.mostOutpostsScore:0.000} demo={s.demographicScore:0.000}");
                 }
                 data.debugBreakdown = dbg.ToString();
             }
@@ -205,8 +298,6 @@ namespace RimSynapse.RegionsAndTerritories
 
             float assignedTotal = data.factionScores.Sum(s => s.TotalScore);
             data.unclaimedScore = Mathf.Max(0f, 1f - assignedTotal);
-
-            return data;
         }
 
         /// <summary>
@@ -327,96 +418,10 @@ namespace RimSynapse.RegionsAndTerritories
             return perimeter;
         }
 
-        private static Dictionary<int, Faction> MapPerimeterTileOwners(HashSet<int> perimeterTiles, List<WorldObject> primary, List<WorldObject> secondary)
-        {
-            Dictionary<int, Faction> map = new Dictionary<int, Faction>();
-            WorldGrid grid = Find.WorldGrid;
-
-            var activeObjects = primary.Concat(secondary).Where(o => o.Faction != null).ToList();
-            if (activeObjects.Count == 0) return map;
-
-            foreach (int tileId in perimeterTiles)
-            {
-                WorldObject closestObj = null;
-                int minDist = int.MaxValue;
-
-                foreach (var obj in activeObjects)
-                {
-                    int dist = grid.TraversalDistanceBetween(tileId, obj.Tile);
-                    if (dist < minDist)
-                    {
-                        minDist = dist;
-                        closestObj = obj;
-                    }
-                }
-
-                if (closestObj != null && closestObj.Faction != null)
-                {
-                    map[tileId] = closestObj.Faction;
-                }
-            }
-            return map;
-        }
-
-        private static void CalculateFactionScores(RegionalOwnershipData data, HashSet<Faction> factions, GeographicProvince province, List<WorldObject> primary, List<WorldObject> secondary, HashSet<int> perimeterTiles, Dictionary<int, Faction> perimeterOwnerMap)
-        {
-            Faction maxExternalOwner = GetMaxExternalPerimeterOwner(perimeterOwnerMap);
-            Faction maxSecondaryOwner = GetMaxSecondaryHoldingOwner(secondary);
-
-            float primaryTotal = WeightedTotal(primary);
-            float secondaryTotal = WeightedTotal(secondary);
-
-            foreach (Faction f in factions)
-            {
-                var score = new FactionOwnershipScore { faction = f };
-
-                // 1. Primary holding share (20%) — settlements, plus military installations at
-                //    reduced weight. Identical to the pre-0.7 settlement share when no military
-                //    installations are present.
-                if (primaryTotal > 0f)
-                {
-                    score.settlementScore = 0.20f * (WeightedTotalFor(primary, f) / primaryTotal);
-                }
-
-                // 2. Perimeter Coverage Score (20%) and External Perimeter Bonus (10%)
-                if (perimeterTiles.Count > 0)
-                {
-                    int fPerimeterCount = perimeterOwnerMap.Values.Count(v => v == f);
-                    score.perimeterCoverageScore = 0.20f * ((float)fPerimeterCount / perimeterTiles.Count);
-                }
-                if (maxExternalOwner != null && f == maxExternalOwner)
-                {
-                    score.externalPerimeterScore = 0.10f;
-                }
-
-                // 3. Secondary holding share (20%) and most-holdings bonus (10%) — outposts, plus
-                //    camps at reduced weight.
-                if (secondaryTotal > 0f)
-                {
-                    score.outpostCoverageScore = 0.20f * (WeightedTotalFor(secondary, f) / secondaryTotal);
-                }
-                if (maxSecondaryOwner != null && f == maxSecondaryOwner)
-                {
-                    score.mostOutpostsScore = 0.10f;
-                }
-
-                // 4. Demographic Score (20%)
-                score.demographicScore = CalculateDemographicScore(province, f, primary);
-
-                data.factionScores.Add(score);
-            }
-        }
-
-        private static Faction GetMaxExternalPerimeterOwner(Dictionary<int, Faction> perimeterOwnerMap)
-        {
-            if (perimeterOwnerMap.Count == 0) return null;
-            var groups = perimeterOwnerMap.Values.GroupBy(v => v).OrderByDescending(g => g.Count()).ToList();
-            if (groups.Count > 0 && groups[0].Count() > 0)
-            {
-                return groups[0].Key;
-            }
-            return null;
-        }
+        // Border scoring no longer maps perimeter tiles to the nearest object (the
+        // TraversalDistanceBetween pass that MapPerimeterTileOwners / GetMaxExternalPerimeterOwner /
+        // the old CalculateFactionScores did). It is derived from neighbour ownership over the
+        // precomputed borderShares in ApplyBordersAndNormalize (#44) — cheaper and owner-correct.
 
         private static Faction GetMaxSecondaryHoldingOwner(List<WorldObject> secondary)
         {

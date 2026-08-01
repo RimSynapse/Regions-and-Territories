@@ -1450,16 +1450,29 @@ namespace RimSynapse.RegionsAndTerritories
                 bucket.Add(obj);
             }
 
+            // Pass 1: each province's ownership from its own holdings only, plus its dominant owner —
+            // what neighbours read when computing their border scores.
+            var ownerByProvince = new Dictionary<int, Faction>(provinces.Count);
             foreach (var province in provinces)
             {
-                province.owningFactionIds.Clear();
                 List<RimWorld.Planet.WorldObject> regionObjects;
                 if (!objectsByProvince.TryGetValue(province.id, out regionObjects)) regionObjects = EmptyWorldObjects;
-                province.ownershipData = RegionalOwnershipUtility.CalculateOwnership(province, regionObjects);
+                province.ownershipData = RegionalOwnershipUtility.CalculateOwnershipBase(province, regionObjects);
+                ownerByProvince[province.id] = RegionalOwnershipUtility.DominantBaseOwner(province.ownershipData);
+            }
 
-                if (province.ownershipData != null && province.ownershipData.factionScores != null)
+            // Pass 2: fold in border influence from neighbours' owners over the static borderShares,
+            // normalize, and publish the owning-faction list. The geometry is precomputed, so this is
+            // where "region 487 changed owner -> recompute 326's borders" stays cheap (#44).
+            foreach (var province in provinces)
+            {
+                RegionalOwnershipUtility.ApplyBordersAndNormalize(province.ownershipData, province, ownerByProvince);
+
+                province.owningFactionIds.Clear();
+                var data = province.ownershipData;
+                if (data != null && data.factionScores != null)
                 {
-                    foreach (var fs in province.ownershipData.factionScores)
+                    foreach (var fs in data.factionScores)
                     {
                         if (fs.faction != null && fs.TotalScore > 0.05f)
                         {
