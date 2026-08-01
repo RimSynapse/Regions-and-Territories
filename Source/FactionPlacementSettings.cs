@@ -62,6 +62,15 @@ namespace RimSynapse.RegionsAndTerritories
         /// </summary>
         public static bool strictTerritorialOwnershipDefault = true;
 
+        /// <summary>
+        /// Show the derivation breakdowns in region tooltips (ownership now; economics and produced
+        /// goods later) so the numbers can be inspected without Development mode. Off by default (#54).
+        /// </summary>
+        public static bool showCalculationBreakdowns = false;
+
+        /// <summary>True when calculation breakdowns should be shown — the setting, or Dev Mode.</summary>
+        public static bool ShowCalculations => showCalculationBreakdowns || Prefs.DevMode;
+
         public override void ExposeData()
         {
             base.ExposeData();
@@ -70,6 +79,7 @@ namespace RimSynapse.RegionsAndTerritories
             Scribe_Values.Look(ref maxThreatPercent, "maxThreatPercent", 0.50f);
             Scribe_Values.Look(ref maxSettlementPercentOfRegions, "maxSettlementPercentOfRegions", 0.50f);
             Scribe_Values.Look(ref strictTerritorialOwnershipDefault, "strictTerritorialOwnershipDefault", true);
+            Scribe_Values.Look(ref showCalculationBreakdowns, "showCalculationBreakdowns", false);
 
             // 0.7: world-object governance / mod-integration switches.
             Integration.WorldObjectIntegrationSettings.ExposeData();

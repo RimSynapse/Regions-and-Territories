@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Linq;
 using HarmonyLib;
 using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories
@@ -10,6 +11,20 @@ namespace RimSynapse.RegionsAndTerritories
     public class RegionsAndTerritoriesMod : Mod
     {
         public static FactionPlacementSettings Settings;
+
+        public override string SettingsCategory() => "RimSynapse Regions & Territories";
+
+        public override void DoSettingsWindowContents(Rect inRect)
+        {
+            var l = new Listing_Standard();
+            l.Begin(inRect);
+            l.CheckboxLabeled("Show calculation breakdowns in tooltips",
+                ref FactionPlacementSettings.showCalculationBreakdowns,
+                "Adds the raw derivation to region tooltips (ownership now; regional economics and produced goods later), so the numbers can be inspected without Development mode.");
+            l.Gap();
+            l.Label("Planet region size, placement rules and world-object integration are configured on the world-generation screen.");
+            l.End();
+        }
 
         public RegionsAndTerritoriesMod(ModContentPack content) : base(content)
         {

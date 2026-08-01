@@ -296,10 +296,10 @@ namespace RimSynapse.RegionsAndTerritories
                                + (outpostInPlay ? 0.30f : 0f) + (demoInPlay ? 0.20f : 0f);
             float normScale = (inPlayWeight > 0f && inPlayWeight < 1f) ? 1f / inPlayWeight : 1f;
 
-            if (Prefs.DevMode)
+            if (FactionPlacementSettings.ShowCalculations)
             {
                 var dbg = new System.Text.StringBuilder();
-                dbg.AppendLine("--- [DEV] raw ownership derivation ---");
+                dbg.AppendLine("--- ownership derivation ---");
                 dbg.AppendLine($"primary(settle/mil)={data.primaryCount}  secondary(outpost/camp)={data.secondaryCount}  borderEdges(claimed/total)={data.claimedBorderEdges}/{data.totalBorderEdges}");
                 dbg.AppendLine($"inPlay: settle={settleInPlay}  borders={bordersInPlay}  bonus={bonusInPlay}  outposts={outpostInPlay}  demo={demoInPlay}");
                 dbg.AppendLine($"inPlayWeight={inPlayWeight:0.00}  scale={normScale:0.00}");
