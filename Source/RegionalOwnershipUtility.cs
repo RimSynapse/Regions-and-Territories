@@ -168,7 +168,15 @@ namespace RimSynapse.RegionsAndTerritories
             // Primary holdings are the population centres and the forces stationed to hold them;
             // secondary holdings are the production and forward positions that support them.
             var primary = regionObjects.Where(o => IsKind(o, WorldObjectKind.Settlement, WorldObjectKind.Military)).ToList();
-            var secondary = regionObjects.Where(o => IsKind(o, WorldObjectKind.Outpost, WorldObjectKind.Camp)).ToList();
+            // A settlement counts as an outpost too: settlements matter enough to map dynamics that
+            // they are double-counted — once for the settlement component, once for the outpost
+            // component and its most-holdings bonus. So a lone settlement earns settle 0.20 +
+            // outpost 0.20 + most 0.10 = 0.50 over the 0.80 denominator (#44).
+            var secondary = regionObjects.Where(o =>
+            {
+                WorldObjectKind k = WorldObjectClassifier.Classify(o);
+                return k == WorldObjectKind.Outpost || k == WorldObjectKind.Camp || k == WorldObjectKind.Settlement;
+            }).ToList();
             data.primaryCount = primary.Count;
             data.secondaryCount = secondary.Count;
 
