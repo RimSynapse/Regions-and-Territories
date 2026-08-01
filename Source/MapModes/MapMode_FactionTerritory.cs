@@ -153,19 +153,28 @@ namespace RimSynapse.RegionsAndTerritories
         public override void MapModeOnGUI()
         {
             base.MapModeOnGUI();
-            if (Find.World != null)
+            if (Find.World == null) return;
+
+            // The influence pie is a selection panel now, not a hover-follow (#50): show it for the
+            // selected region and anchor it in a fixed corner so it stays put while inspecting,
+            // rather than flickering under the cursor. The text tooltip still handles hover.
+            var selector = Find.WorldSelector;
+            if (selector == null || !selector.AnyObjectOrTileSelected) return;
+
+            int tile = selector.SelectedTile;
+            if (tile < 0)
             {
-                int mouseTile = GenWorld.MouseTile();
-                if (mouseTile >= 0)
-                {
-                    var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                    var province = regionManager?.GetProvinceForTile(mouseTile);
-                    if (province != null)
-                    {
-                        UI.RegionalPieChartWindow.DrawHoverWindow(province, Event.current.mousePosition);
-                    }
-                }
+                var obj = selector.SingleSelectedObject as RimWorld.Planet.WorldObject;
+                if (obj != null) tile = obj.Tile;
             }
+            if (tile < 0) return;
+
+            var regionManager = Find.World.GetComponent<SynapseRegionManager>();
+            var province = regionManager?.GetProvinceForTile(tile);
+            if (province == null) return;
+
+            Vector2 anchor = new Vector2(10f, Verse.UI.screenHeight - 210f);
+            UI.RegionalPieChartWindow.DrawHoverWindow(province, anchor);
         }
 
         public override string GetTooltip(int tile)
