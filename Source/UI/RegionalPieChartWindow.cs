@@ -47,7 +47,7 @@ namespace RimSynapse.RegionsAndTerritories.UI
             }, false, false, 1f);
         }
 
-        private static List<PieSlice> BuildPieSlices(RegionalOwnershipData data)
+        public static List<PieSlice> BuildPieSlices(RegionalOwnershipData data)
         {
             List<PieSlice> slices = new List<PieSlice>();
             foreach (var fs in data.factionScores)
@@ -74,7 +74,7 @@ namespace RimSynapse.RegionsAndTerritories.UI
             return slices;
         }
 
-        private static void DrawLegend(Rect rect, List<PieSlice> slices)
+        public static void DrawLegend(Rect rect, List<PieSlice> slices)
         {
             Text.Font = GameFont.Tiny;
             float y = rect.y;

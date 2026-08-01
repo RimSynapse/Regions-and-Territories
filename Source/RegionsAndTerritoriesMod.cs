@@ -18,9 +18,27 @@ namespace RimSynapse.RegionsAndTerritories
         {
             var l = new Listing_Standard();
             l.Begin(inRect);
-            l.CheckboxLabeled("Show calculation breakdowns in tooltips",
+
+            l.CheckboxLabeled("Show ownership calculation breakdown in the region panel",
                 ref FactionPlacementSettings.showCalculationBreakdowns,
-                "Adds the raw derivation to region tooltips (ownership now; regional economics and produced goods later), so the numbers can be inspected without Development mode.");
+                "Adds the developer ownership-derivation readout to the expanded region panel (opened with the modifier + click chosen below). Off by default, and never shown in the hover tooltip.");
+
+            l.Gap();
+            l.Label("Open a region's comparison panel with:");
+            if (l.RadioButton("Ctrl + click", !FactionPlacementSettings.regionPanelUseShift))
+            {
+                FactionPlacementSettings.regionPanelUseShift = false;
+            }
+            if (l.RadioButton("Shift + click", FactionPlacementSettings.regionPanelUseShift))
+            {
+                FactionPlacementSettings.regionPanelUseShift = true;
+            }
+
+            l.Gap();
+            FactionPlacementSettings.maxRegionPanels = Mathf.RoundToInt(l.SliderLabeled(
+                $"Max comparison panels open at once: {FactionPlacementSettings.maxRegionPanels}",
+                FactionPlacementSettings.maxRegionPanels, 1f, 8f));
+
             l.Gap();
             l.Label("Planet region size, placement rules and world-object integration are configured on the world-generation screen.");
             l.End();

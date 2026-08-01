@@ -316,7 +316,10 @@ namespace RimSynapse.RegionsAndTerritories
             // touch it (#49). Combined with these regions being large, this leaves them contested-weak.
             if (province != null && province.IsBarren) normScale *= 0.5f;
 
-            if (FactionPlacementSettings.ShowCalculations)
+            // Only build the developer derivation when the mod option is explicitly on — not merely
+            // because Dev Mode is — so the calculation is not triggered in the background and shows
+            // only in the expanded region panel (#53/#54).
+            if (FactionPlacementSettings.showCalculationBreakdowns)
             {
                 var dbg = new System.Text.StringBuilder();
                 dbg.AppendLine("--- ownership derivation ---");

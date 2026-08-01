@@ -14,6 +14,23 @@ namespace RimSynapse.RegionsAndTerritories
         private int[] tileToProvinceId;
         private Dictionary<int, int> settlementPlacementOrder = new Dictionary<int, int>();
 
+        // Region-growth tuning (#3). MinFillFraction is the share of the value budget a region must
+        // fill unconditionally before it switches from filling to border-seeking. BarrierStepCost is
+        // the step-cost threshold that separates an open-terrain hop (base ~1, up to ~1.9 with the
+        // meander warp) from crossing a natural feature (mountain / water / river, each +12): a step
+        // at or above it is treated as crossing a boundary and is refused while border-seeking.
+        private const float MinFillFraction = 0.45f;
+        private const float BarrierStepCost = 3f;
+        // Minimum number of open-terrain links to the region required to annex a tile while
+        // border-seeking. 1 only refuses tiles reachable solely across a natural feature (the far
+        // side of a boundary); shape compactness is handled by the frontier priority, not this gate.
+        private const int CompactLinkMin = 1;
+        // How strongly the frontier prefers tiles already surrounded by the region over tiles that
+        // would extend a finger. Each not-yet-claimed neighbour adds this to the tile's priority
+        // (higher = later), so concavities fill first and regions grow as compact blobs. This is the
+        // only shape pressure in feature-poor terrain, so it must outweigh the ~1-per-tile distance.
+        private const float CompactWeight = 4f;
+
         public int GetSettlementPlacementOrder(int tileId)
         {
             if (settlementPlacementOrder != null && settlementPlacementOrder.TryGetValue(tileId, out int order))
@@ -745,6 +762,14 @@ namespace RimSynapse.RegionsAndTerritories
             // crude carve to undo the terrain-following boundaries. EnforceMaxRegionSize is retained
             // as a method for now but no longer called.
 
+            // Phase 5b2: fold impassable-mountain (and other unclaimed, non-water) pockets that are
+            // fully enclosed by a single region INTO that region, so they read as owned terrain rather
+            // than holes punched in the map (#3).
+            AbsorbEnclosedGaps();
+
+            // Phase 5c: relax jagged boundaries and swallow single-tile land islands.
+            SmoothRegionBoundaries(5);
+
             // Naming Phase: Contextual Name Resolution
             Log.Message("[RimSynapse-RegionsAndTerritories] Running contextual province naming...");
             ResolveContextualNames();
@@ -754,6 +779,155 @@ namespace RimSynapse.RegionsAndTerritories
             BuildProvinceTopology();
 
             Log.Message($"[RimSynapse-RegionsAndTerritories] Generated {provinces.Count} Geographic Domains.");
+        }
+
+        /// <summary>
+        /// Fold unclaimed, non-water tile pockets that are fully enclosed by a single land region into
+        /// that region (#3). Impassable mountains are excluded from region growth and otherwise sit as
+        /// unowned holes; when such a pocket touches exactly one land region (and neither water nor an
+        /// ocean province), it belongs to that region and is absorbed. A pocket bordering two or more
+        /// regions is a genuine natural boundary and is left alone.
+        /// </summary>
+        private void AbsorbEnclosedGaps()
+        {
+            if (provinces == null || tileToProvinceId == null || Find.WorldGrid == null) return;
+
+            var byId = provinces.ToDictionary(p => p.id, p => p);
+            int total = tileToProvinceId.Length;
+            var visited = new bool[total];
+            var neighbors = new List<RimWorld.Planet.PlanetTile>();
+            int absorbed = 0;
+
+            for (int t = 0; t < total; t++)
+            {
+                if (visited[t]) continue;
+                visited[t] = true;
+                if (tileToProvinceId[t] != -1) continue;
+                if (Find.WorldGrid[t].WaterCovered) continue;   // water gaps are not "enclosed by land"
+
+                // Flood the connected unclaimed, non-water pocket, recording which land regions ring it.
+                var pocket = new List<int> { t };
+                var queue = new Queue<int>();
+                queue.Enqueue(t);
+                var ringRegions = new HashSet<int>();
+                bool openToWater = false;
+
+                while (queue.Count > 0)
+                {
+                    int cur = queue.Dequeue();
+                    neighbors.Clear();
+                    Find.WorldGrid.GetTileNeighbors(cur, neighbors);
+                    foreach (var n in neighbors)
+                    {
+                        int nid = n.tileId;
+                        int npid = tileToProvinceId[nid];
+                        if (npid == -1)
+                        {
+                            if (Find.WorldGrid[nid].WaterCovered) { openToWater = true; continue; }
+                            if (!visited[nid]) { visited[nid] = true; pocket.Add(nid); queue.Enqueue(nid); }
+                        }
+                        else if (byId.TryGetValue(npid, out var np) && np.provinceType == ProvinceType.Land)
+                        {
+                            ringRegions.Add(npid);
+                        }
+                        else
+                        {
+                            openToWater = true;   // bordered by ocean / a water province
+                        }
+                    }
+                }
+
+                if (!openToWater && ringRegions.Count == 1)
+                {
+                    var region = byId[System.Linq.Enumerable.First(ringRegions)];
+                    foreach (int c in pocket)
+                    {
+                        tileToProvinceId[c] = region.id;
+                        region.tiles.Add(c);
+                    }
+                    absorbed += pocket.Count;
+                }
+            }
+
+            if (absorbed > 0)
+            {
+                Log.Message($"[RimSynapse-RegionsAndTerritories] Absorbed {absorbed} enclosed impassable/unclaimed tiles into their surrounding regions.");
+            }
+        }
+
+        /// <summary>
+        /// Curvature-smooth jagged region boundaries and swallow land islands (#3).
+        ///
+        /// <para>The value-budgeted growth follows terrain but leaves boundaries 3-4x longer than a
+        /// compact shape would have, where two frontiers interlocked tile-by-tile. A majority-vote
+        /// relaxation shortens them: a land tile wrapped more by a neighbouring region than by its own
+        /// is reassigned to that neighbour, eroding convex spikes and filling concave notches while
+        /// leaving straight and gently-curved edges (three-plus same-region neighbours) in place.
+        /// Water, rivers and impassable tiles never count, so real coastlines are never rounded off.
+        /// Iterating several passes lets multi-tile excursions resolve from the outside in.</para>
+        /// </summary>
+        private void SmoothRegionBoundaries(int passes)
+        {
+            if (provinces == null || tileToProvinceId == null || Find.WorldGrid == null) return;
+
+            var landIds = new HashSet<int>(provinces
+                .Where(p => p.provinceType == ProvinceType.Land)
+                .Select(p => p.id));
+            if (landIds.Count < 2) return;
+
+            var neighbors = new List<RimWorld.Planet.PlanetTile>();
+            var counts = new Dictionary<int, int>();
+
+            for (int pass = 0; pass < passes; pass++)
+            {
+                var reassign = new Dictionary<int, int>();
+                for (int t = 0; t < tileToProvinceId.Length; t++)
+                {
+                    int pid = tileToProvinceId[t];
+                    if (pid < 0 || !landIds.Contains(pid)) continue;
+
+                    neighbors.Clear();
+                    Find.WorldGrid.GetTileNeighbors(t, neighbors);
+                    counts.Clear();
+                    int same = 0, landNeighbours = 0, bestId = -1, bestCount = 0;
+                    foreach (var n in neighbors)
+                    {
+                        int np = tileToProvinceId[n.tileId];
+                        if (np < 0 || !landIds.Contains(np)) continue;   // coast/river/impassable edge: keep it
+                        landNeighbours++;
+                        if (np == pid) { same++; continue; }
+                        int c; counts.TryGetValue(np, out c); c++; counts[np] = c;
+                        if (c > bestCount) { bestCount = c; bestId = np; }
+                    }
+
+                    // Curvature smoothing: if a neighbouring land region wraps this tile more than its
+                    // own does (bestCount > same), the tile sits on a convex spike or in a concave
+                    // notch of the boundary, and moving it there shortens the total border. Restricting
+                    // to same <= 2 keeps straight and gently-curved edges (same >= 3) untouched, so only
+                    // the jagged excursions erode. Iterated over several passes this pulls a 3-4x-too-
+                    // long boundary down toward the compact ideal without flattening real coastlines
+                    // (feature edges never count toward either tally).
+                    if (landNeighbours >= 3 && same <= 2 && bestId != -1 && bestCount > same)
+                        reassign[t] = bestId;
+                }
+
+                if (reassign.Count == 0) break;
+                foreach (var kv in reassign) tileToProvinceId[kv.Key] = kv.Value;
+            }
+
+            // Rebuild land tile lists from the corrected map; water/river provinces are untouched
+            // above so their lists stay valid. Drop any land province emptied by the relaxation.
+            var byId = provinces.ToDictionary(p => p.id, p => p);
+            foreach (var p in provinces)
+                if (landIds.Contains(p.id)) p.tiles = new List<int>();
+            for (int t = 0; t < tileToProvinceId.Length; t++)
+            {
+                int pid = tileToProvinceId[t];
+                GeographicProvince prov;
+                if (pid >= 0 && landIds.Contains(pid) && byId.TryGetValue(pid, out prov))
+                    prov.tiles.Add(t);
+            }
+            provinces.RemoveAll(p => landIds.Contains(p.id) && p.tiles.Count == 0);
         }
 
         private bool ChunkHasNaturalFeatures(List<int> chunk)
@@ -914,21 +1088,58 @@ namespace RimSynapse.RegionsAndTerritories
                 if (!remaining.Contains(start)) continue;
 
                 var region = new List<int>();
+                var regionSet = new HashSet<int>();
                 float regionPoints = 0f;
                 var costs = new Dictionary<int, float>();
+                var claimedNbr = new Dictionary<int, int>();
                 costs[start] = 0f;
                 var pq = new SimplePriorityQueue<int>();
                 pq.Enqueue(start, 0f);
 
-                // Grow until the region has accumulated its VALUE budget, not a tile count: fertile /
-                // mineral-rich land fills the budget fast (compact regions), barren waste and water
-                // fill it slowly (sprawling regions). This one rule is the size cap AND the
-                // rich-compact / barren-sprawling character (#3/#49).
+                // Two-phase growth (#3). The VALUE budget still sets the rich-compact / barren-sprawl
+                // character, but it is no longer a hard fill target:
+                //   * Below minPoints (must-fill): annex the cheapest reachable tile no matter what —
+                //     a value-starved core is allowed to reach across a river or ridge to become viable.
+                //   * At/above minPoints (border-seeking): refuse to cross a natural feature. The region
+                //     keeps flowing through connected open terrain until mountains, rivers and water
+                //     enclose it, so the border snaps ONTO those features and crosses open gaps only at
+                //     their narrowest (the pass). When nothing is left to annex without crossing a
+                //     feature, the region ends EARLY — even below the cap — and the featureless interior
+                //     beyond the enclosure is left unclaimed (no-man's-land) rather than split by an
+                //     arbitrary bisector.
+                float minPoints = pointCap * MinFillFraction;
                 while (pq.Count > 0 && regionPoints < pointCap)
                 {
                     int cur = pq.Dequeue();
-                    if (!remaining.Remove(cur)) continue;   // claimed already (stale queue entry)
+                    if (!remaining.Contains(cur)) continue;   // claimed already (stale queue entry)
+
+                    if (regionPoints >= minPoints)
+                    {
+                        // Border-seeking with a compactness gate (#3). Count the region's own tiles
+                        // adjacent to this one through OPEN terrain (a feature edge does not count —
+                        // that is the far side of a natural boundary and must stay the border). Annex
+                        // only when at least CompactLinkMin such links exist: a single-link tile is a
+                        // finger / tumour tip, and refusing it holds growth to broad advancing fronts,
+                        // so regions stay compact (low perimeter) instead of snaking or sprouting lobes
+                        // while still hugging features. Below minPoints this gate is off, so a starved
+                        // core may still reach out to become viable.
+                        int openLinks = 0;
+                        neighbors.Clear();
+                        Find.WorldGrid.GetTileNeighbors(cur, neighbors);
+                        foreach (var n in neighbors)
+                        {
+                            if (regionSet.Contains(n.tileId) && TerrainStepCost(cur, n.tileId) < BarrierStepCost)
+                            {
+                                openLinks++;
+                                if (openLinks >= CompactLinkMin) break;
+                            }
+                        }
+                        if (openLinks < CompactLinkMin) continue;
+                    }
+
+                    remaining.Remove(cur);
                     region.Add(cur);
+                    regionSet.Add(cur);
                     regionPoints += TilePoints(cur);
 
                     neighbors.Clear();
@@ -937,13 +1148,26 @@ namespace RimSynapse.RegionsAndTerritories
                     {
                         int nid = n.tileId;
                         if (!remaining.Contains(nid)) continue;
-                        float nc = costs[cur] + TerrainStepCost(cur, nid);
+
+                        // cur just joined the region, so nid gained one more claimed neighbour.
+                        int cn;
+                        claimedNbr.TryGetValue(nid, out cn);
+                        cn++;
+                        claimedNbr[nid] = cn;
+
+                        float terrain = costs[cur] + TerrainStepCost(cur, nid);
                         float existing;
-                        if (!costs.TryGetValue(nid, out existing) || nc < existing)
-                        {
-                            costs[nid] = nc;
-                            pq.Enqueue(nid, nc);
-                        }
+                        if (!costs.TryGetValue(nid, out existing) || terrain < existing)
+                            costs[nid] = terrain;
+
+                        // Priority = distance from the seed plus a compactness penalty for every
+                        // still-unclaimed neighbour: a tile boxed in by the region (few unclaimed
+                        // neighbours) is annexed before a tile that would poke out a finger. Re-enqueued
+                        // each time a neighbour is claimed so the penalty falls as the notch fills;
+                        // stale duplicates are skipped by the remaining-set check at dequeue. Barrier
+                        // avoidance is the gate above, not here, so this only reshapes the open frontier.
+                        float priority = costs[nid] + CompactWeight * (6 - cn);
+                        pq.Enqueue(nid, priority);
                     }
                 }
                 result.Add(region);
@@ -1303,17 +1527,36 @@ namespace RimSynapse.RegionsAndTerritories
                     {
                         var sortedNeighbors = neighborWeights.OrderByDescending(kv => kv.Value).ToList();
                         GeographicProvince bestNeighbor = null;
+                        GeographicProvince dominantLand = null;
 
                         foreach (var kvp in sortedNeighbors)
                         {
                             if (provinceMap.TryGetValue(kvp.Key, out var neighborProv))
                             {
+                                // Remember the highest-weight (most shared edges) land neighbour as a
+                                // rescue target, regardless of the size cap.
+                                if (dominantLand == null && neighborProv.provinceType == ProvinceType.Land)
+                                    dominantLand = neighborProv;
+
                                 if (neighborProv.tiles.Count(t => IsTileUsable(t)) + p.tiles.Count(t => IsTileUsable(t)) <= FactionPlacementSettings.maxRegionSize + 50)
                                 {
                                     bestNeighbor = neighborProv;
                                     break;
                                 }
                             }
+                        }
+
+                        // Orphan rescue (#3): a small pocket whose neighbours are all already at or past
+                        // the size cap — the common case next to a low-value tundra/desert region that
+                        // sprawled to ~200 tiles under the value budget — would otherwise survive as an
+                        // arbitrary leftover island (no natural border, sometimes the same faction as the
+                        // neighbour). Fold it into its dominant land neighbour anyway; a slightly
+                        // oversized low-value region reads far better than a stranded gap. Bounded to
+                        // genuinely small pockets so this never chains medium regions into a monster.
+                        if (bestNeighbor == null && dominantLand != null &&
+                            p.tiles.Count <= FactionPlacementSettings.minRegionSize / 2)
+                        {
+                            bestNeighbor = dominantLand;
                         }
 
                         if (bestNeighbor != null)
