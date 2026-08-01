@@ -44,6 +44,12 @@ namespace RimSynapse.RegionsAndTerritories
             Integration.WorldObjectAdapterRegistry.Initialize();
 
             RegisterProvidersWithCore();
+
+            // Region introspection tools over Core's MCP bridge (get_region_info, show_world_map).
+            // Deferred so Core has registered its own tools first — both run via ExecuteWhenFinished
+            // and Core loads before this mod, so its callback is queued first.
+            LongEventHandler.ExecuteWhenFinished(Integration.RegionMcpTools.RegisterWithCore);
+
             TryPatchEmpires(harmony);
             TryPatchVOE(harmony);
         }
