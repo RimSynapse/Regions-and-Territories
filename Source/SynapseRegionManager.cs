@@ -527,9 +527,9 @@ namespace RimSynapse.RegionsAndTerritories
                 bool hasFeatures = ChunkHasNaturalFeatures(landPocket);
                 int maxAllowed = hasFeatures ? maxWithFeatures : maxNoFeatures;
 
-                int usableCount = landPocket.Count(t => IsTileUsable(t));
-
-                if (usableCount <= maxAllowed)
+                // Decide and bound on TOTAL tiles, not usable: a coastal pocket with few usable tiles
+                // but a lot of water still needs bounding, or it stays oversized (#49/#3).
+                if (landPocket.Count <= maxAllowed)
                 {
                     GeographicProvince domain = new GeographicProvince(provinceIdCounter);
                     domain.tiles = landPocket.ToList();
@@ -963,6 +963,7 @@ namespace RimSynapse.RegionsAndTerritories
             bool rough = ta.hilliness == Hilliness.LargeHills || ta.hilliness == Hilliness.Mountainous
                       || tb.hilliness == Hilliness.LargeHills || tb.hilliness == Hilliness.Mountainous;
             if (rough) cost += 12f;
+            if (ta.WaterCovered || tb.WaterCovered) cost += 12f;   // water is a barrier too — regions don't spread across it
             if (Find.WorldGrid.GetRiverDef(a, b) != null || Find.WorldGrid.GetRiverDef(b, a) != null) cost += 12f;
             return cost;
         }
