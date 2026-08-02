@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Linq;
 using HarmonyLib;
 using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories
@@ -10,6 +11,38 @@ namespace RimSynapse.RegionsAndTerritories
     public class RegionsAndTerritoriesMod : Mod
     {
         public static FactionPlacementSettings Settings;
+
+        public override string SettingsCategory() => "RimSynapse Regions & Territories";
+
+        public override void DoSettingsWindowContents(Rect inRect)
+        {
+            var l = new Listing_Standard();
+            l.Begin(inRect);
+
+            l.CheckboxLabeled("Show ownership calculation breakdown in the region panel",
+                ref FactionPlacementSettings.showCalculationBreakdowns,
+                "Adds the developer ownership-derivation readout to the expanded region panel (opened with the modifier + click chosen below). Off by default, and never shown in the hover tooltip.");
+
+            l.Gap();
+            l.Label("Open a region's comparison panel with:");
+            if (l.RadioButton("Ctrl + click", !FactionPlacementSettings.regionPanelUseShift))
+            {
+                FactionPlacementSettings.regionPanelUseShift = false;
+            }
+            if (l.RadioButton("Shift + click", FactionPlacementSettings.regionPanelUseShift))
+            {
+                FactionPlacementSettings.regionPanelUseShift = true;
+            }
+
+            l.Gap();
+            FactionPlacementSettings.maxRegionPanels = Mathf.RoundToInt(l.SliderLabeled(
+                $"Max comparison panels open at once: {FactionPlacementSettings.maxRegionPanels}",
+                FactionPlacementSettings.maxRegionPanels, 1f, 8f));
+
+            l.Gap();
+            l.Label("Planet region size, placement rules and world-object integration are configured on the world-generation screen.");
+            l.End();
+        }
 
         public RegionsAndTerritoriesMod(ModContentPack content) : base(content)
         {
@@ -29,6 +62,12 @@ namespace RimSynapse.RegionsAndTerritories
             Integration.WorldObjectAdapterRegistry.Initialize();
 
             RegisterProvidersWithCore();
+
+            // Region introspection tools over Core's MCP bridge (get_region_info, show_world_map).
+            // Deferred so Core has registered its own tools first — both run via ExecuteWhenFinished
+            // and Core loads before this mod, so its callback is queued first.
+            LongEventHandler.ExecuteWhenFinished(Integration.RegionMcpTools.RegisterWithCore);
+
             TryPatchEmpires(harmony);
             TryPatchVOE(harmony);
         }

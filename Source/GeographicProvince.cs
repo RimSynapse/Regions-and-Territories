@@ -35,55 +35,58 @@ namespace RimSynapse.RegionsAndTerritories
         public RegionalOwnershipData ownershipData;
         public ProvinceType provinceType = ProvinceType.Land;
 
+        // --- Topology aggregate (#48) -------------------------------------------
+        // Derived purely from tile membership, so it is deliberately never scribed:
+        // SynapseRegionManager.BuildProvinceTopology fills it once (at generation, and lazily after
+        // load) and every perimeter/border query reads it instead of rescanning tiles. This is the
+        // "aggregate the region into one object and query it" model — the same one the resource
+        // pools below already follow.
+        public List<int> perimeterTiles;             // boundary tiles of this province
+        public Dictionary<int, int> borderShares;    // neighbour province id -> count of shared boundary edges
+        public int perimeterEdgeCount;               // total boundary edges, including edges to water / unassigned
+        public int naturalBorderEdges;               // edges against water / impassable mountains — secure frontiers for this region's own owner
+
         // --- Economics / Demographics ---
         public bool initializedEconomics;
 
+        // Population and dwellings are a materialized aggregate: summed once from the per-tile
+        // density cache and re-summed only when that cache is invalidated (a population-bearing
+        // world object added or removed), tracked by PopulationDensityUtility.CacheVersion. The old
+        // getters re-summed every tile on every read (dwellings) or cached without ever
+        // invalidating (population, which went stale). _populationVersion is not scribed, so the
+        // first read after a load recomputes once.
         private int _totalDwellings;
-        public int totalDwellings
+        private int _currentPopulation;
+        private int _populationVersion = -1;
+
+        private void EnsurePopulationAggregate()
         {
-            get
+            int version = PopulationDensityUtility.CacheVersion;
+            if (_populationVersion == version) return;
+
+            int total = 0;
+            if (tiles != null)
             {
-                int totalProvincePop = 0;
-                if (tiles != null)
+                foreach (int tileId in tiles)
                 {
-                    foreach (int tileId in tiles)
-                    {
-                        totalProvincePop += PopulationDensityUtility.GetPopulationAtTile(tileId);
-                    }
+                    total += PopulationDensityUtility.GetPopulationAtTile(tileId);
                 }
-                if (totalProvincePop <= 0) return 0;
-                int dwellings = totalProvincePop / 2;
-                return dwellings < 1 ? 1 : dwellings;
             }
-            set
-            {
-                _totalDwellings = value;
-            }
+            _currentPopulation = total;
+            _totalDwellings = total <= 0 ? 0 : System.Math.Max(1, total / 2);
+            _populationVersion = version;
         }
 
-        private int _currentPopulation;
+        public int totalDwellings
+        {
+            get { EnsurePopulationAggregate(); return _totalDwellings; }
+            set { _totalDwellings = value; _populationVersion = PopulationDensityUtility.CacheVersion; }
+        }
+
         public int currentPopulation
         {
-            get
-            {
-                if (_currentPopulation <= 0)
-                {
-                    int totalProvincePop = 0;
-                    if (tiles != null)
-                    {
-                        foreach (int tileId in tiles)
-                        {
-                            totalProvincePop += PopulationDensityUtility.GetPopulationAtTile(tileId);
-                        }
-                    }
-                    _currentPopulation = totalProvincePop;
-                }
-                return _currentPopulation;
-            }
-            set
-            {
-                _currentPopulation = value;
-            }
+            get { EnsurePopulationAggregate(); return _currentPopulation; }
+            set { _currentPopulation = value; _populationVersion = PopulationDensityUtility.CacheVersion; }
         }
 
         // --- Resource pools (0.7 Epic 3) --------------------------------------
@@ -179,6 +182,19 @@ namespace RimSynapse.RegionsAndTerritories
         {
             this.id = id;
         }
+
+        /// <summary>
+        /// A barren, low-productivity biome — desert, ice, extreme desert — where little grows and
+        /// animal life is hard to sustain. These lump into large unsplit regions and are weakly
+        /// contested no-man's-land, because nobody wants to settle them (#49).
+        /// </summary>
+        public static bool IsBarrenBiome(BiomeDef biome)
+        {
+            return biome != null && biome.plantDensity < 0.12f;
+        }
+
+        /// <summary>True when this region's dominant biome is barren no-man's-land.</summary>
+        public bool IsBarren => IsBarrenBiome(primaryBiome);
 
         public void ExposeData()
         {

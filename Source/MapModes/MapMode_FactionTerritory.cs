@@ -36,21 +36,30 @@ namespace RimSynapse.RegionsAndTerritories
 
             foreach (var province in regionManager.Provinces)
             {
-                if (province.tiles.Count == 0 || !province.owningFactionIds.Any()) continue;
+                // Draw every land region, not just owned ones (#53): the whole partition should be
+                // visible in Territories mode. Ocean is still skipped.
+                if (province.tiles.Count == 0 || province.provinceType == ProvinceType.Ocean) continue;
 
                 var factions = province.owningFactionIds
                     .Select(id => Find.FactionManager.AllFactions.FirstOrDefault(f => f.GetUniqueLoadID() == id))
                     .Where(f => f != null)
                     .ToList();
 
-                if (factions.Count == 0) continue;
-
                 Material bodyMat = null;
                 Material borderMat = null;
                 Color borderColor = Color.white;
                 string ownerString;
 
-                if (factions.Count == 1)
+                if (factions.Count == 0)
+                {
+                    // Unclaimed: faint neutral fill and a plain white outline, so owned territory still
+                    // reads first while the region is still shown.
+                    Color bodyColor = new Color(0.6f, 0.6f, 0.6f, 0.12f);
+                    borderColor = new Color(1f, 1f, 1f, 0.7f);
+                    bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(bodyColor);
+                    ownerString = "Unclaimed wilderness";
+                }
+                else if (factions.Count == 1)
                 {
                     Faction faction = factions[0];
                     Color baseColor = faction.Color;
@@ -150,34 +159,15 @@ namespace RimSynapse.RegionsAndTerritories
             return tex;
         }
 
-        public override void MapModeOnGUI()
-        {
-            base.MapModeOnGUI();
-            if (Find.World != null)
-            {
-                int mouseTile = GenWorld.MouseTile();
-                if (mouseTile >= 0)
-                {
-                    var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                    var province = regionManager?.GetProvinceForTile(mouseTile);
-                    if (province != null)
-                    {
-                        UI.RegionalPieChartWindow.DrawHoverWindow(province, Event.current.mousePosition);
-                    }
-                }
-            }
-        }
-
+        // Hover shows a short quick-glance tooltip at the cursor; the full readout is the selection
+        // panel drawn in MapModeOnGUI (#53).
         public override string GetTooltip(int tile)
         {
             if (Find.World == null) return base.GetTooltip(tile);
             var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-            if (regionManager == null) return base.GetTooltip(tile);
-
-            var province = regionManager.GetProvinceForTile(tile);
+            var province = regionManager?.GetProvinceForTile(tile);
             if (province == null) return base.GetTooltip(tile);
-
-            return MapMode_GeographicProvinces.GetProvinceTooltip(province, tile);
+            return MapMode_GeographicProvinces.GetProvinceTooltipShort(province);
         }
     }
 }

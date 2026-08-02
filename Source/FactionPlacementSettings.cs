@@ -62,6 +62,27 @@ namespace RimSynapse.RegionsAndTerritories
         /// </summary>
         public static bool strictTerritorialOwnershipDefault = true;
 
+        /// <summary>
+        /// Show the derivation breakdowns in region tooltips (ownership now; economics and produced
+        /// goods later) so the numbers can be inspected without Development mode. Off by default (#54).
+        /// </summary>
+        public static bool showCalculationBreakdowns = false;
+
+        /// <summary>True when calculation breakdowns should be shown — the setting, or Dev Mode.</summary>
+        public static bool ShowCalculations => showCalculationBreakdowns || Prefs.DevMode;
+
+        /// <summary>
+        /// Which modifier opens a region comparison panel on click (#53): Shift+click when true,
+        /// Ctrl+click when false. Configurable so it can be moved off a key that conflicts.
+        /// </summary>
+        public static bool regionPanelUseShift = false;
+
+        /// <summary>
+        /// How many region comparison panels may be open at once (#53). Default 2 for a side-by-side
+        /// compare; raise it to experiment with more. When exceeded the oldest panel closes (FIFO).
+        /// </summary>
+        public static int maxRegionPanels = 2;
+
         public override void ExposeData()
         {
             base.ExposeData();
@@ -70,6 +91,9 @@ namespace RimSynapse.RegionsAndTerritories
             Scribe_Values.Look(ref maxThreatPercent, "maxThreatPercent", 0.50f);
             Scribe_Values.Look(ref maxSettlementPercentOfRegions, "maxSettlementPercentOfRegions", 0.50f);
             Scribe_Values.Look(ref strictTerritorialOwnershipDefault, "strictTerritorialOwnershipDefault", true);
+            Scribe_Values.Look(ref showCalculationBreakdowns, "showCalculationBreakdowns", false);
+            Scribe_Values.Look(ref regionPanelUseShift, "regionPanelUseShift", false);
+            Scribe_Values.Look(ref maxRegionPanels, "maxRegionPanels", 2);
 
             // 0.7: world-object governance / mod-integration switches.
             Integration.WorldObjectIntegrationSettings.ExposeData();

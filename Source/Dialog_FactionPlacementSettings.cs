@@ -98,9 +98,12 @@ namespace RimSynapse.RegionsAndTerritories
             Rect estRect = new Rect(10f, 135f, globalBoxRect.width - 20f, 22f);
             Widgets.Label(estRect, $"Estimated Land Tiles: <color=cyan>{landTiles}</color> (at {Mathf.RoundToInt(coverage * 100f)}% coverage) | Expected Region Count: <color=green>{estMin} - {estMax}</color> (Avg Size: {avgSize:F0} tiles)");
 
-            DrawIntegrationPanel(new Rect(0f, 205f, inRect.width - 15f, 152f));
+            // Box is tall enough for the "Detected:" status line at the bottom (title + master +
+            // four 24px rows + the status row need ~178px); outRect starts below it so the label
+            // can't spill onto the Faction Geography scroll panel (#47).
+            DrawIntegrationPanel(new Rect(0f, 205f, inRect.width - 15f, 178f));
 
-            Rect outRect = new Rect(0f, 365f, inRect.width, inRect.height - 420f);
+            Rect outRect = new Rect(0f, 388f, inRect.width, inRect.height - 443f);
             Rect viewRect = new Rect(0f, 0f, inRect.width - 25f, activeFactions.Count * 265f);
 
             Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect);

@@ -1,5 +1,6 @@
 using HarmonyLib;
 using RimWorld.Planet;
+using RimSynapse.RegionsAndTerritories.Integration;
 using Verse;
 
 namespace RimSynapse.RegionsAndTerritories.Patches
@@ -10,12 +11,7 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPostfix]
         public static void Postfix(WorldObject __instance)
         {
-            // 0.7: any object that contributes residents invalidates the density cache,
-            // not just vanilla settlements and VOE outposts.
-            if (Integration.WorldObjectClassifier.HasPopulation(__instance))
-            {
-                PopulationDensityUtility.MarkCacheDirty();
-            }
+            InvalidateCaches.OnWorldObjectChanged(__instance);
         }
     }
 
@@ -25,9 +21,32 @@ namespace RimSynapse.RegionsAndTerritories.Patches
         [HarmonyPostfix]
         public static void Postfix(WorldObject __instance)
         {
-            // 0.7: any object that contributes residents invalidates the density cache,
-            // not just vanilla settlements and VOE outposts.
-            if (Integration.WorldObjectClassifier.HasPopulation(__instance))
+            InvalidateCaches.OnWorldObjectChanged(__instance);
+        }
+    }
+
+    internal static class InvalidateCaches
+    {
+        /// <summary>
+        /// A world object was added or removed. Invalidate the caches whose inputs it changed:
+        /// - population density, for anything that contributes residents;
+        /// - province ownership, for any territorial holding (settlement/outpost/military/camp) —
+        ///   including non-population military installations, which the density check alone misses.
+        /// Classify once and reuse. Transient/non-territorial objects (caravans, sites) touch nothing.
+        /// </summary>
+        public static void OnWorldObjectChanged(WorldObject obj)
+        {
+            WorldObjectKind kind = WorldObjectClassifier.Classify(obj);
+
+            if (kind == WorldObjectKind.Settlement
+                || kind == WorldObjectKind.Outpost
+                || kind == WorldObjectKind.Military
+                || kind == WorldObjectKind.Camp)
+            {
+                SynapseRegionManager.BumpOwnershipEpoch();
+            }
+
+            if (WorldObjectClassifier.HasPopulation(obj))
             {
                 PopulationDensityUtility.MarkCacheDirty();
             }

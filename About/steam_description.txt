@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.7.0 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.7.1 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Regions and Territories[/h1]
 [b][url=https://github.com/RimSynapse/Regions-and-Territories/wiki]Official Wiki and Documentation[/url][/b]
@@ -35,46 +35,27 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-[*] [b]0.9 - Factions and Living Societies:[/b] State ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Bringing every module back together for another pass over what the whole set can do.
+[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideological demographics - a per-region belief-distribution model, pawns generated from it, a migrating dwelling heatmap, Empire hiring cost and resource overlays tied to regional population, plus world-gen options (land coverage and multiple continents) and livable ruins.
+[*] [b]0.9 - Factions and Living Societies:[/b] Deeper placement and territory governance feeding the Factions layer.
+[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how territory drives the whole set.
 [/list]
 These ship when they are ready - no dates.
 
 ---
 
-[h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
+[h2]Changelog (v0.7.1) - Region generation, map modes and performance[/h2]
 [list]
-[*] NEW - Mod-agnostic world object integration: Empire Refactored, Vanilla Outposts Expanded, Vanilla Expanded Framework and World Domination are recognised through adapter profiles instead of by name, so territory rules no longer hardcode which mods exist.
-[*] NEW - Placement and territory governance: one evaluator decides where settlements, outposts, military installations and camps may stand, and the world inspect pane tells you why a tile was refused.
-[*] NEW - Compatibility mode: a world generated before this mod is adopted rather than refused, and you are told when that happens.
-[*] Fixed: Empire settlement population always read as zero. Three of the four adapter profiles named members or types that do not exist on the real assemblies, and nothing said so - a wrong name cost no error, it just returned a plausible zero.
-[*] Fixed: Vanilla Expanded Framework renamed its assembly from VFECore to VEF, so that profile had resolved to nothing for as long as it had existed.
-[*] Changed: the demographic component of territory ownership contributes nothing this release. It was awarding a fifth of the score for simply owning a settlement, which the settlement score already counted. It returns in 0.8 reading real regional demographics.
-[*] REQUIRES A NEW COLONY - not save-game compatible.
+[*] [b]NEW - Region generation overhaul:[/b] provinces now grow terrain-aware and value-budgeted, following rivers, coastlines and mountains for prettier, more natural borders instead of arbitrary straight lines, and region size is bounded so no single province swallows the map.
+[*] [b]NEW - Map modes:[/b] a faction-shaded Territories view and a Population / dwellings view, drawn through the Map Mode Framework.
+[*] [b]NEW - Region-border overlay:[/b] an owner-coloured border overlay in the main Draw Settings toggles that works over any map mode.
+[*] [b]NEW - Region comparison panels:[/b] modifier-click a region (Ctrl or Shift, rebindable in the mod settings) to open a draggable readout; open several at once to compare, each titled by its unique region number.
+[*] [b]Performance:[/b] region aggregates - population, ownership, perimeter and border shares - are materialised and cached instead of recomputed every frame, and world-object bucketing is now O(n), so large worlds draw and tick far cheaper.
+[*] [b]Changed:[/b] the influence pie opens on region selection rather than on stationary hover; an optional setting shows ownership calculation breakdowns in tooltips without Dev Mode.
+[*] [b]Fixed:[/b] the settings "Detected:" integration line drew over the Faction Geography panel.
+[*] [b]Fixed:[/b] a settlement-validity check queried the player faction during world generation and spammed the log with errors.
+[*] The new region generation applies to newly generated worlds; a new colony is recommended for the full effect.
 [/list]
-
----
-
-[h2]Changelog (v0.6.2)[/h2]
-[list]
-[*] [b]No gameplay changes.[/b] This release exists so the save-compatibility notice reaches people who already have the mod installed. Nothing in the mod behaves differently.
-[*] [b]NOTICE - the warning is now in the game, not just on this page:[/b] Regions and Territories has always needed a new colony, and this page has said so - but the in-game mod description did not, so anyone who subscribed and never came back here had no way to find out. It now says the same thing here, in the mod list, and in the compatibility matrix.
-[*] [b]Looking ahead to 0.7:[/b] Worlds saved by 0.7 will not read correctly if you roll back to 0.6 - the new regional resource stocks are dropped and mined-out provinces come back full. Loading an existing 0.6 world in 0.7 is fine and stays fine; it is only the way back that breaks.
-[/list]
-
----
-
-[h2]Changelog (v0.6.1)[/h2]
-[list]
-[*] [b]FIXED - mod list metadata:[/b] The in-game mod list still showed v0.5.2 with no v0.6.0 notes. Version and changelog now agree in every place they are stated.
-[*] [b]Roadmap updated:[/b] 0.7 is now Regions and Territories compatibility - the groundwork the Factions work depends on. Everything after it shifts up one release.
-[/list]
-
----
-[b]Older releases:[/b] see the release notes at [url=https://github.com/RimSynapse/Regions-and-Territories/releases]github.com/RimSynapse/Regions-and-Territories[/url]
+[b]Full version history:[/b] [url=https://github.com/RimSynapse/Regions-and-Territories/wiki/Changelog]github.com/RimSynapse/Regions-and-Territories/wiki[/url]
 
 ---
 

@@ -62,9 +62,15 @@ namespace RimSynapse.RegionsAndTerritories
         private static int[] cachedTilePopulations = null;
         private static bool cacheDirty = true;
 
+        // Bumped on every invalidation so province-level aggregates (currentPopulation, dwellings)
+        // can tell in O(1) whether their cached sum is still current, instead of re-summing tiles
+        // on every read. Add/remove of a population-bearing world object marks this dirty (#48).
+        public static int CacheVersion { get; private set; }
+
         public static void MarkCacheDirty()
         {
             cacheDirty = true;
+            CacheVersion++;
         }
 
         private static void RefreshCache()

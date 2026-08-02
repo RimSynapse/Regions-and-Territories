@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Registers the region-border overlay as a global world draw layer (#53). RimWorld 1.6 instantiates
+    world draw layers from defs (GlobalWorldDrawLayerDef / per-PlanetLayer), NOT by reflecting over
+    WorldDrawLayer subclasses, so a layer class alone is never created. A global layer is drawn on every
+    planet layer regardless of the active map mode, which is exactly what the overlay needs. The layer
+    itself no-ops unless the "Draw region borders" toggle is on.
+  -->
+  <GlobalWorldDrawLayerDef>
+    <defName>SynapseRegionBorders</defName>
+    <worldDrawLayer>RimSynapse.RegionsAndTerritories.WorldLayer_RegionBorders</worldDrawLayer>
+  </GlobalWorldDrawLayerDef>
+
+</Defs>

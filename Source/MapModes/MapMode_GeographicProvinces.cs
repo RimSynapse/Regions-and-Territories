@@ -19,6 +19,12 @@ namespace RimSynapse.RegionsAndTerritories
         public MapMode_GeographicProvinces() { }
         public MapMode_GeographicProvinces(MapModeDef def) : base(def) { }
 
+        /// <summary>
+        /// When true the region bodies are left transparent and only their outlines are drawn, so the
+        /// division lines overlay the real terrain (biomes, hills) instead of washing it out (#53).
+        /// </summary>
+        protected virtual bool BordersOnly => false;
+
         public override void SetRegions()
         {
             if (!UnityData.IsInMainThread) return;
@@ -36,30 +42,37 @@ namespace RimSynapse.RegionsAndTerritories
             {
                 if (province.tiles.Count == 0) continue;
 
+                // Borders-only overlay leaves every body transparent; the coloured fills below are only
+                // for the standard "regions" view.
                 Material bodyMat = BaseContent.ClearMat;
-                if (province.provinceType == ProvinceType.Ocean)
+                if (!BordersOnly)
                 {
-                    bodyMat = BaseContent.ClearMat;
-                }
-                else if (province.provinceType == ProvinceType.Lake)
-                {
-                    bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.12f, 0.45f, 0.8f, 0.25f));
-                }
-                else if (province.provinceType == ProvinceType.River)
-                {
-                    bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.12f, 0.65f, 0.8f, 0.3f));
-                }
-                else if (province.provinceType == ProvinceType.MountainRange)
-                {
-                    bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.48f, 0.48f, 0.48f, 0.35f));
-                }
-                else
-                {
-                    Color uniqueColor = GetUniqueColor(province.id);
-                    bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(uniqueColor);
+                    if (province.provinceType == ProvinceType.Ocean)
+                    {
+                        bodyMat = BaseContent.ClearMat;
+                    }
+                    else if (province.provinceType == ProvinceType.Lake)
+                    {
+                        bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.12f, 0.45f, 0.8f, 0.25f));
+                    }
+                    else if (province.provinceType == ProvinceType.River)
+                    {
+                        bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.12f, 0.65f, 0.8f, 0.3f));
+                    }
+                    else if (province.provinceType == ProvinceType.MountainRange)
+                    {
+                        bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.48f, 0.48f, 0.48f, 0.35f));
+                    }
+                    else
+                    {
+                        Color uniqueColor = GetUniqueColor(province.id);
+                        bodyMat = SolidColorMaterials.SimpleSolidColorMaterial(uniqueColor);
+                    }
                 }
 
-                Color borderColor = new Color(1f, 1f, 1f, 0.8f);
+                // A borders-only overlay has no fill to read against, so draw the outline at full
+                // opacity; the filled view keeps the softer border so the colours stay legible.
+                Color borderColor = BordersOnly ? new Color(1f, 1f, 1f, 1f) : new Color(1f, 1f, 1f, 0.8f);
                 Material borderMat = null;
                 if (ShaderDatabase.MetaOverlay != null && BaseContent.WhiteTex != null)
                 {
@@ -112,34 +125,15 @@ namespace RimSynapse.RegionsAndTerritories
             }
         }
 
-        public override void MapModeOnGUI()
-        {
-            base.MapModeOnGUI();
-            if (Find.World != null)
-            {
-                int mouseTile = GenWorld.MouseTile();
-                if (mouseTile >= 0)
-                {
-                    var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-                    var province = regionManager?.GetProvinceForTile(mouseTile);
-                    if (province != null)
-                    {
-                        UI.RegionalPieChartWindow.DrawHoverWindow(province, Event.current.mousePosition);
-                    }
-                }
-            }
-        }
-
+        // Retained only for its static tooltip helpers; this mode is no longer registered (the section
+        // is Territories + Population). Selection/hover UI lives on MapMode_FactionTerritory.
         public override string GetTooltip(int tile)
         {
             if (Find.World == null) return base.GetTooltip(tile);
             var regionManager = Find.World.GetComponent<SynapseRegionManager>();
-            if (regionManager == null) return base.GetTooltip(tile);
-
-            var province = regionManager.GetProvinceForTile(tile);
+            var province = regionManager?.GetProvinceForTile(tile);
             if (province == null) return base.GetTooltip(tile);
-
-            return GetProvinceTooltip(province, tile);
+            return GetProvinceTooltipShort(province);
         }
 
         public static string GetProvinceTooltip(GeographicProvince province, int tile)
@@ -168,7 +162,7 @@ namespace RimSynapse.RegionsAndTerritories
                 sb.AppendLine("--- Regional Influence Breakdown ---");
                 foreach (var fs in data.factionScores)
                 {
-                    if (fs.TotalScore <= 0.001f) continue;
+                    if (fs.TotalScore < 0.01f) continue;   // hide negligible border grazes (a few edges)
                     string fname = fs.faction != null ? TextureUtility.GetFactionDisplayName(fs.faction) : "Unknown";
                     sb.AppendLine($"- {fname}: {fs.TotalScore:P0}");
                     sb.AppendLine($"  (Settlements: {fs.settlementScore:P0}, Borders: {fs.perimeterCoverageScore + fs.externalPerimeterScore:P0}, Outposts: {fs.outpostCoverageScore + fs.mostOutpostsScore:P0}, Ideology: {fs.demographicScore:P0})");
@@ -176,6 +170,15 @@ namespace RimSynapse.RegionsAndTerritories
                 if (data.unclaimedScore > 0.01f)
                 {
                     sb.AppendLine($"- Unclaimed: {data.unclaimedScore:P0}");
+                }
+
+                // The ownership derivation is a developer readout — show it only when the mod option is
+                // explicitly on (not merely because Dev Mode is), and only here in the expanded panel,
+                // never in the hover tooltip (#53/#54).
+                if (FactionPlacementSettings.showCalculationBreakdowns && !string.IsNullOrEmpty(data.debugBreakdown))
+                {
+                    sb.AppendLine();
+                    sb.Append(data.debugBreakdown);
                 }
             }
 
@@ -207,6 +210,21 @@ namespace RimSynapse.RegionsAndTerritories
             }
 
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// The quick-glance hover tooltip (#53): a few lines only — name, biome, owner, size — so it can
+        /// sit at the cursor without wrapping or covering the map. The full breakdown is the selection
+        /// panel (RegionInfoWindow), not this.
+        /// </summary>
+        public static string GetProvinceTooltipShort(GeographicProvince province)
+        {
+            if (province == null) return string.Empty;
+            string owner = province.ownershipData != null
+                ? RegionalDomainUtility.GetStatusDescription(province.ownershipData)
+                : "Unclaimed";
+            string biome = province.primaryBiome?.LabelCap ?? "Unknown";
+            return $"{province.name}\n{biome} — {owner}\nTiles: {province.tiles.Count}  (click for details)";
         }
 
         private Color GetUniqueColor(int id)

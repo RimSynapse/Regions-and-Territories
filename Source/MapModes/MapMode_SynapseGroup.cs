@@ -19,22 +19,20 @@ namespace RimSynapse.RegionsAndTerritories
 
             List<FloatMenuOption> options = new List<FloatMenuOption>();
 
-            var popMode = MapModeComponent.Instance.mapModes.FirstOrDefault(m => m.def.defName == "SynapsePopulationDensity");
-            if (popMode != null)
-            {
-                options.Add(new FloatMenuOption(popMode.def.LabelCap, () => MapModeComponent.Instance.RequestMapModeSwitch(popMode)));
-            }
-
+            // The RimSynapse section is exactly two views: Territories (faction shading) and
+            // Population/dwellings. Region division lines are a global overlay toggle in the map-mode
+            // Draw Settings (see Patch_MapModeUI_RegionBorders), not a mode of their own, so they can
+            // be shown on top of any map mode.
             var territoryMode = MapModeComponent.Instance.mapModes.FirstOrDefault(m => m.def.defName == "SynapseFactionTerritory");
             if (territoryMode != null)
             {
                 options.Add(new FloatMenuOption(territoryMode.def.LabelCap, () => MapModeComponent.Instance.RequestMapModeSwitch(territoryMode)));
             }
 
-            var regionMode = MapModeComponent.Instance.mapModes.FirstOrDefault(m => m.def.defName == "SynapseGeographicProvinces");
-            if (regionMode != null)
+            var popMode = MapModeComponent.Instance.mapModes.FirstOrDefault(m => m.def.defName == "SynapsePopulationDensity");
+            if (popMode != null)
             {
-                options.Add(new FloatMenuOption(regionMode.def.LabelCap, () => MapModeComponent.Instance.RequestMapModeSwitch(regionMode)));
+                options.Add(new FloatMenuOption(popMode.def.LabelCap, () => MapModeComponent.Instance.RequestMapModeSwitch(popMode)));
             }
 
             if (options.Any())
