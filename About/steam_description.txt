@@ -36,10 +36,10 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 [h2]Roadmap[/h2]
 [list]
 [*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-[*] [b]0.9 - Factions and Living Societies:[/b] State ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Bringing every module back together for another pass over what the whole set can do.
+[*] [b]0.7 - Regions and Territories Compatibility:[/b] Current release - geographic provinces, territory overlays and geography-driven faction placement alongside Empire Refactored, Outposts Expanded and World Domination.
+[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideological demographics - a per-region belief-distribution model, pawns generated from it, a migrating dwelling heatmap, Empire hiring cost and resource overlays tied to regional population, plus world-gen options (land coverage and multiple continents) and livable ruins.
+[*] [b]0.9 - Factions and Living Societies:[/b] Deeper placement and territory governance feeding the Factions layer.
+[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how territory drives the whole set.
 [/list]
 These ship when they are ready - no dates.
 

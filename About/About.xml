@@ -51,11 +51,11 @@ Removing the mod from an in-progress save will log errors about missing province
 Requires: Map Mode Framework
 
 --- Roadmap ---
-0.6 - Agent and Tool Foundation: delivered in v0.6.0.
-0.7 - Regions and Territories Compatibility: basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-0.8 - Demographics, News and Narrative Voice: regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-0.9 - Factions and Living Societies: state ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-0.10 - Cross-Mod Capability Passes: bringing every module back together for another pass over what the whole set can do.
+0.6 - Agent and Tool Foundation: Delivered in v0.6.0.
+0.7 - Regions and Territories Compatibility: Current release - geographic provinces, territory overlays and geography-driven faction placement alongside Empire Refactored, Outposts Expanded and World Domination.
+0.8 - Demographics, News and Narrative Voice: Regional ideological demographics - a per-region belief-distribution model, pawns generated from it, a migrating dwelling heatmap, Empire hiring cost and resource overlays tied to regional population, plus world-gen options (land coverage and multiple continents) and livable ruins.
+0.9 - Factions and Living Societies: Deeper placement and territory governance feeding the Factions layer.
+0.10 - Cross-Mod Capability Passes: Another pass over how territory drives the whole set.
 These ship when they are ready - no dates.
 
 --- Changelog ---
