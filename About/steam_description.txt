@@ -35,8 +35,6 @@ Regions and Territories divides the globe into dynamic geographic provinces with
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Current release - geographic provinces, territory overlays and geography-driven faction placement alongside Empire Refactored, Outposts Expanded and World Domination.
 [*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideological demographics - a per-region belief-distribution model, pawns generated from it, a migrating dwelling heatmap, Empire hiring cost and resource overlays tied to regional population, plus world-gen options (land coverage and multiple continents) and livable ruins.
 [*] [b]0.9 - Factions and Living Societies:[/b] Deeper placement and territory governance feeding the Factions layer.
 [*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how territory drives the whole set.
@@ -55,26 +53,7 @@ These ship when they are ready - no dates.
 [*] Changed: the demographic component of territory ownership contributes nothing this release. It was awarding a fifth of the score for simply owning a settlement, which the settlement score already counted. It returns in 0.8 reading real regional demographics.
 [*] REQUIRES A NEW COLONY - not save-game compatible.
 [/list]
-
----
-
-[h2]Changelog (v0.6.2)[/h2]
-[list]
-[*] [b]No gameplay changes.[/b] This release exists so the save-compatibility notice reaches people who already have the mod installed. Nothing in the mod behaves differently.
-[*] [b]NOTICE - the warning is now in the game, not just on this page:[/b] Regions and Territories has always needed a new colony, and this page has said so - but the in-game mod description did not, so anyone who subscribed and never came back here had no way to find out. It now says the same thing here, in the mod list, and in the compatibility matrix.
-[*] [b]Looking ahead to 0.7:[/b] Worlds saved by 0.7 will not read correctly if you roll back to 0.6 - the new regional resource stocks are dropped and mined-out provinces come back full. Loading an existing 0.6 world in 0.7 is fine and stays fine; it is only the way back that breaks.
-[/list]
-
----
-
-[h2]Changelog (v0.6.1)[/h2]
-[list]
-[*] [b]FIXED - mod list metadata:[/b] The in-game mod list still showed v0.5.2 with no v0.6.0 notes. Version and changelog now agree in every place they are stated.
-[*] [b]Roadmap updated:[/b] 0.7 is now Regions and Territories compatibility - the groundwork the Factions work depends on. Everything after it shifts up one release.
-[/list]
-
----
-[b]Older releases:[/b] see the release notes at [url=https://github.com/RimSynapse/Regions-and-Territories/releases]github.com/RimSynapse/Regions-and-Territories[/url]
+[b]Full version history:[/b] [url=https://github.com/RimSynapse/Regions-and-Territories/wiki/Changelog]github.com/RimSynapse/Regions-and-Territories/wiki[/url]
 
 ---
 
