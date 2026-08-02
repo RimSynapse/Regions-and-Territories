@@ -2,6 +2,17 @@
 
 Full version history for RimSynapse - Regions and Territories. The mod page and Workshop description show only the latest release; every earlier version is recorded here.
 
+## v0.7.1 - Region generation, map modes and performance
+- NEW - Region generation overhaul: provinces now grow terrain-aware and value-budgeted, following rivers, coastlines and mountains for prettier, more natural borders instead of arbitrary straight lines, and region size is bounded so no single province swallows the map.
+- NEW - Map modes: a faction-shaded Territories view and a Population / dwellings view, drawn through the Map Mode Framework.
+- NEW - Region-border overlay: an owner-coloured border overlay in the main Draw Settings toggles that works over any map mode.
+- NEW - Region comparison panels: modifier-click a region (Ctrl or Shift, rebindable in the mod settings) to open a draggable readout; open several at once to compare, each titled by its unique region number.
+- Performance: region aggregates - population, ownership, perimeter and border shares - are materialised and cached instead of recomputed every frame, and world-object bucketing is now O(n), so large worlds draw and tick far cheaper.
+- Changed: the influence pie opens on region selection rather than on stationary hover; an optional setting shows ownership calculation breakdowns in tooltips without Dev Mode.
+- Fixed: the settings "Detected:" integration line drew over the Faction Geography panel.
+- Fixed: a settlement-validity check queried the player faction during world generation and spammed the log with errors.
+- The new region generation applies to newly generated worlds; a new colony is recommended for the full effect.
+
 ## v0.7.0 - Regions and Territories Compatibility
 - NEW - Mod-agnostic world object integration: Empire Refactored, Vanilla Outposts Expanded, Vanilla Expanded Framework and World Domination are recognised through adapter profiles instead of by name, so territory rules no longer hardcode which mods exist.
 - NEW - Placement and territory governance: one evaluator decides where settlements, outposts, military installations and camps may stand, and the world inspect pane tells you why a tile was refused.
