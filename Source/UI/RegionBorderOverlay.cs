@@ -28,7 +28,18 @@ namespace RimSynapse.RegionsAndTerritories.UI
         {
             if (!materials.TryGetValue(color, out Material mat) || mat == null)
             {
-                mat = MaterialPool.MatFrom(BaseContent.WhiteTex, ShaderDatabase.MetaOverlay, color, 3600);
+                // Occlusion is the shader's depth test, not the render queue. MetaOverlay is ZTest
+                // Always — it paints on top of everything, so far-hemisphere borders showed straight
+                // through the planet (#59). A WorldOverlay* surface shader is depth-tested against the
+                // globe, so the solid planet occludes the back the way it does for vanilla surface
+                // overlays and MMF's own WorldOverlayAdditive selection ring. Use the *unlit*
+                // Transparent variant (not TransparentLit) so borders stay full-colour on the planet's
+                // night side rather than dimming with the sun. Keep queue 3600 so lines still draw over
+                // the map-mode fills on the near side; the Lift in WorldLayer_RegionBorders handles
+                // z-fighting there while depth hides the far side. Fall back to MetaOverlay only if the
+                // shader is somehow unavailable, so a missing field degrades to the old look, not a crash.
+                Shader shader = ShaderDatabase.WorldOverlayTransparent ?? ShaderDatabase.MetaOverlay;
+                mat = MaterialPool.MatFrom(BaseContent.WhiteTex, shader, color, 3600);
                 materials[color] = mat;
             }
             return mat;
